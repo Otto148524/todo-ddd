@@ -1,0 +1,8 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:todo-ddd"
+    - path: "app"
+      component: "exe:todo-ddd-exe"
+    - path: "test"
+      component: "test:todo-ddd-test"

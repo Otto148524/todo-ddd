@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Sourcing Todo App - Servant Backend</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .main-panel {
+      flex: 1;
+      padding: 40px;
+    }
+
+    .event-panel {
+      width: 400px;
+      background: #f8f9fa;
+      padding: 30px;
+      border-left: 1px solid #e0e0e0;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 32px;
+    }
+
+    h2 {
+      color: #555;
+      margin-bottom: 20px;
+      font-size: 20px;
+    }
+
+    .connection-status {
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .connected {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .disconnected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .input-group {
+      display: flex;
+      margin-bottom: 30px;
+      gap: 10px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    button {
+      padding: 15px 30px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .todo-list {
+      list-style: none;
+    }
+
+    .todo-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: white;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      transition: all 0.3s;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .todo-item:hover {
+      border-color: #667eea;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .todo-item.completed {
+      opacity: 0.6;
+    }
+
+    .todo-item.completed .todo-text {
+      text-decoration: line-through;
+      color: #999;
+    }
+
+    .todo-checkbox {
+      width: 24px;
+      height: 24px;
+      margin-right: 15px;
+      cursor: pointer;
+    }
+
+    .todo-text {
+      flex: 1;
+      font-size: 16px;
+      color: #333;
+    }
+
+    .todo-delete {
+      padding: 8px 15px;
+      background: #ff4757;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+
+    .todo-delete:hover {
+      background: #ff3838;
+    }
+
+    .event-item {
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      animation: eventSlideIn 0.3s ease;
+    }
+
+    @keyframes eventSlideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .event-type {
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+
+    .event-data {
+      color: #666;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      background: #f0f0f0;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 5px;
+    }
+
+    .event-time {
+      color: #999;
+      font-size: 11px;
+      margin-top: 5px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+
+    .stat-item {
+      flex: 1;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    .error-message {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      color: #667eea;
+      padding: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="main-panel">
+      <h1>📝 Todo App (Haskell Backend)</h1>
+
+      <div class="connection-status" id="connectionStatus">
+        Connecting to server...
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-value" id="totalCount">0</div>
+          <div class="stat-label">Total Tasks</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="activeCount">0</div>
+          <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="completedCount">0</div>
+          <div class="stat-label">Completed</div>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <input type="text" id="todoInput" placeholder="新しいタスクを入力..." />
+        <button id="addButton">追加</button>
+      </div>
+
+      <div id="errorContainer"></div>
+      <ul class="todo-list" id="todoList"></ul>
+    </div>
+
+    <div class="event-panel">
+      <h2>📊 Event History</h2>
+      <div id="eventHistory"></div>
+    </div>
+  </div>
+
+  <script>
+    // ========================================
+    // API Client
+    // ========================================
+
+    class TodoAPIClient {
+      constructor(baseURL = 'http://localhost:8080/api') {
+        this.baseURL = baseURL;
+      }
+
+      async fetchTodos() {
+        try {
+          const response = await fetch(`${this.baseURL}/todos`);
+          if (!response.ok) throw new Error('Failed to fetch todos');
+          return await response.json();
+        } catch (error) {
+          console.error('Fetch error:', error);
+          throw error;
+        }
+      }
+
+      async createTodo(text) {
+        try {
+          const response = await fetch(`${this.baseURL}/todos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ requestText: text })
+          });
+          if (!response.ok) throw new Error('Failed to create todo');
+          return await response.json();
+        } catch (error) {
+          console.error('Create error:', error);
+          throw error;
+        }
+      }
+
+      async toggleTodo(id) {
+        try {
+          const response = await fetch(`${this.baseURL}/todos/toggle`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ toggleId: id })
+          });
+          if (!response.ok) throw new Error('Failed to toggle todo');
+        } catch (error) {
+          console.error('Toggle error:', error);
+          throw error;
+        }
+      }
+
+      async deleteTodo(id) {
+        try {
+          const response = await fetch(`${this.baseURL}/todos/delete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ deleteId: id })
+          });
+          if (!response.ok) throw new Error('Failed to delete todo');
+        } catch (error) {
+          console.error('Delete error:', error);
+          throw error;
+        }
+      }
+
+      async fetchEvents() {
+        try {
+          const response = await fetch(`${this.baseURL}/events`);
+          if (!response.ok) throw new Error('Failed to fetch events');
+          return await response.json();
+        } catch (error) {
+          console.error('Fetch events error:', error);
+          throw error;
+        }
+      }
+    }
+
+    // ========================================
+    // UI Controller
+    // ========================================
+
+    class TodoUI {
+      constructor() {
+        this.apiClient = new TodoAPIClient();
+        this.todoList = document.getElementById('todoList');
+        this.todoInput = document.getElementById('todoInput');
+        this.addButton = document.getElementById('addButton');
+        this.totalCount = document.getElementById('totalCount');
+        this.activeCount = document.getElementById('activeCount');
+        this.completedCount = document.getElementById('completedCount');
+        this.connectionStatus = document.getElementById('connectionStatus');
+        this.errorContainer = document.getElementById('errorContainer');
+        this.eventHistory = document.getElementById('eventHistory');
+
+        this.setupEventListeners();
+        this.initialize();
+
+        // Poll for updates
+        this.startPolling();
+      }
+
+      setupEventListeners() {
+        this.addButton.addEventListener('click', () => this.handleAdd());
+        this.todoInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') this.handleAdd();
+        });
+      }
+
+      async initialize() {
+        try {
+          await this.refresh();
+          this.setConnectionStatus(true);
+        } catch (error) {
+          this.setConnectionStatus(false);
+          this.showError('サーバーに接続できません。Haskellサーバーが起動していることを確認してください。');
+        }
+      }
+
+      setConnectionStatus(connected) {
+        if (connected) {
+          this.connectionStatus.textContent = '✓ Connected to Haskell Server';
+          this.connectionStatus.className = 'connection-status connected';
+          this.addButton.disabled = false;
+        } else {
+          this.connectionStatus.textContent = '✗ Disconnected from Server';
+          this.connectionStatus.className = 'connection-status disconnected';
+          this.addButton.disabled = true;
+        }
+      }
+
+      showError(message) {
+        this.errorContainer.innerHTML = `
+                    <div class="error-message">
+                        ${message}
+                    </div>
+                `;
+        setTimeout(() => {
+          this.errorContainer.innerHTML = '';
+        }, 5000);
+      }
+
+      async handleAdd() {
+        const text = this.todoInput.value.trim();
+        if (!text) return;
+
+        try {
+          this.addButton.disabled = true;
+          await this.apiClient.createTodo(text);
+          this.todoInput.value = '';
+          await this.refresh();
+        } catch (error) {
+          this.showError('タスクの追加に失敗しました');
+        } finally {
+          this.addButton.disabled = false;
+        }
+      }
+
+      async handleToggle(id) {
+        try {
+          await this.apiClient.toggleTodo(id);
+          await this.refresh();
+        } catch (error) {
+          this.showError('タスクの更新に失敗しました');
+        }
+      }
+
+      async handleDelete(id) {
+        try {
+          await this.apiClient.deleteTodo(id);
+          await this.refresh();
+        } catch (error) {
+          this.showError('タスクの削除に失敗しました');
+        }
+      }
+
+      async refresh() {
+        try {
+          // Fetch todos and statistics
+          const data = await this.apiClient.fetchTodos();
+          this.renderTodos(data.todos);
+          this.updateStatistics(data.statistics);
+
+          // Fetch and render events
+          const events = await this.apiClient.fetchEvents();
+          this.renderEvents(events);
+
+          this.setConnectionStatus(true);
+        } catch (error) {
+          this.setConnectionStatus(false);
+          throw error;
+        }
+      }
+
+      renderTodos(todos) {
+        this.todoList.innerHTML = '';
+
+        todos.forEach(todo => {
+          const li = document.createElement('li');
+          li.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.className = 'todo-checkbox';
+          checkbox.checked = todo.completed;
+          checkbox.addEventListener('change', () => this.handleToggle(todo.todoId));
+
+          const text = document.createElement('span');
+          text.className = 'todo-text';
+          text.textContent = todo.text;
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'todo-delete';
+          deleteBtn.textContent = '削除';
+          deleteBtn.addEventListener('click', () => this.handleDelete(todo.todoId));
+
+          li.appendChild(checkbox);
+          li.appendChild(text);
+          li.appendChild(deleteBtn);
+
+          this.todoList.appendChild(li);
+        });
+      }
+
+      renderEvents(events) {
+        this.eventHistory.innerHTML = '';
+
+        // Show latest events first
+        const reversedEvents = [...events].reverse();
+
+        reversedEvents.forEach(event => {
+          const eventDiv = document.createElement('div');
+          eventDiv.className = 'event-item';
+
+          const typeDiv = document.createElement('div');
+          typeDiv.className = 'event-type';
+          typeDiv.textContent = event.type;
+
+          eventDiv.appendChild(typeDiv);
+
+          if (event.text) {
+            const dataDiv = document.createElement('div');
+            dataDiv.className = 'event-data';
+            dataDiv.textContent = JSON.stringify({
+              id: event.id,
+              text: event.text
+            }, null, 2);
+            eventDiv.appendChild(dataDiv);
+          }
+
+          const timeDiv = document.createElement('div');
+          timeDiv.className = 'event-time';
+          const timestamp = new Date(event.timestamp);
+          timeDiv.textContent = timestamp.toLocaleTimeString('ja-JP');
+
+          eventDiv.appendChild(timeDiv);
+          this.eventHistory.appendChild(eventDiv);
+        });
+      }
+
+      updateStatistics(stats) {
+        this.totalCount.textContent = stats.totalCount;
+        this.activeCount.textContent = stats.activeCount;
+        this.completedCount.textContent = stats.completedCount;
+      }
+
+      startPolling() {
+        // Poll every 2 seconds for updates
+        setInterval(async () => {
+          try {
+            await this.refresh();
+          } catch (error) {
+            // Silently fail on polling errors
+            console.error('Polling error:', error);
+          }
+        }, 2000);
+      }
+    }
+
+    // ========================================
+    // Application Bootstrap
+    // ========================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+      new TodoUI();
+    });
+  </script>
+</body>
+
+</html>

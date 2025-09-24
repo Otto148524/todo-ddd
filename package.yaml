@@ -1,0 +1,82 @@
+name:                todo-ddd
+version:             0.1.0.0
+github:              "githubuser/todo-ddd"
+license:             BSD-3-Clause
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2025 Author name here"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+description:         Please see the README on GitHub at <https://github.com/githubuser/domainDriven#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- aeson
+- servant
+- servant-server
+- wai
+- wai-cors
+- warp
+- time
+- containers
+- text
+- mtl
+- stm
+- random
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Domain.Todo.ValueObject
+  - Domain.Todo.Entity
+  - Domain.Todo.Events
+  - Domain.Todo.Aggregate
+  - Application.DTO.TodoDTO
+  - Application.Ports.EventStorePort
+  - Application.Ports.NotificationPort
+  - Application.DTO.Facade
+  - Application.TodoService
+  - Infrastructure.EventStore.InMemory
+  - Infrastructure.Web.Types
+  - Infrastructure.Web.Server
+
+  # dependenciesセクションは不要（グローバルのを使用）
+
+executables:
+  todo-ddd-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - todo-ddd  # ここは正しい（ライブラリへの依存）
+
+tests:
+  todo-ddd-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - todo-ddd
+    - hspec >= 2.7
+    - QuickCheck >= 2.13
+
