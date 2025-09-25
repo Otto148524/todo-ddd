@@ -2,48 +2,48 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Domain.Todo.ValueObject
-  ( TodoId(..)
-  , TodoText(..)
-  , mkTodoId
-  , mkTodoText
+  ( TaskId(..)
+  , TaskDescription(..)
+  , mkTaskId
+  , mkTaskDescription
   , IdValue(..)
-  , TextValue(..)
+  , DescriptionValue(..)
   ) where
 
 import Data.Text (Text)
 import GHC.Generics
 
 -- Value Objects
-newtype TodoId = TodoId {unTodoId :: String }
+newtype TaskId = TaskId { getTaskId :: String }
   deriving (Show, Eq, Ord, Generic)
 
-newtype TodoText = TodoText { unTodoText :: String }
+newtype TaskDescription = TaskDescription { getTaskDescription :: String }
   deriving (Show, Eq, Generic)
 
 -- Smart constructors
-mkTodoId :: String -> Either Text TodoId
-mkTodoId tid
-  | null tid = Left "TodoId cannot be empty"
-  | otherwise = Right (TodoId tid)
+mkTaskId :: String -> Either Text TaskId
+mkTaskId tid
+  | null tid = Left "TaskId is required"
+  | otherwise = Right (TaskId tid)
 
-mkTodoText :: String -> Either Text TodoText
-mkTodoText txt
-  | null txt = Left "TodoText cannot be empty"
-  | otherwise = Right (TodoText txt)
+mkTaskDescription :: String -> Either Text TaskDescription
+mkTaskDescription desc
+  | null desc = Left "Task description is required"
+  | otherwise = Right (TaskDescription desc)
 
 -- Type classes fro abstraction
 class IdValue a where
   toIdString :: a -> String
   fromIdString :: String -> Either Text a
 
-class TextValue a where
-  toTextString :: a -> String
-  fromTextString :: String -> Either Text a
+class DescriptionValue a where
+  toDescString :: a -> String
+  fromDescString :: String -> Either Text a
 
-instance IdValue TodoId where
-  toIdString = unTodoId
-  fromIdString = mkTodoId
+instance IdValue TaskId where
+  toIdString = getTaskId
+  fromIdString = mkTaskId
 
-instance TextValue TodoText where
-  toTextString = unTodoText
-  fromTextString = mkTodoText
+instance DescriptionValue TaskDescription where
+  toDescString = getTaskDescription
+  fromDescString = mkTaskDescription

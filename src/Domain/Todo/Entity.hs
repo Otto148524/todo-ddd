@@ -1,15 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Domain.Todo.Entity
-  ( Todo(..)
+  ( Task(..)
   ) where
 
 import Domain.Todo.ValueObject
 
 import GHC.Generics
 
-data Todo = Todo
-  { todoId :: TodoId
-  , text :: TodoText
-  , completed :: Bool
+data Task = Task
+  { taskId :: TaskId
+  , taskDescription :: TaskDescription
+  , isCompleted :: Bool
   } deriving (Show, Eq, Generic)

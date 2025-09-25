@@ -10,8 +10,8 @@ import Data.Time
 import GHC.Generics
 
 data TodoEvent
-  = TodoCreated TodoId TodoText UTCTime
-  | TodoCompleted TodoId UTCTime
-  | TodoUncompleted TodoId UTCTime
-  | TodoDeleted TodoId UTCTime
+  = TaskInitiated TaskId TaskDescription UTCTime
+  | TaskCompleted TaskId UTCTime
+  | TaskReopened TaskId UTCTime
+  | TaskDeleted TaskId UTCTime
   deriving (Show, Eq, Generic)
