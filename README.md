@@ -4,7 +4,7 @@ Haskell implementation of a Todo application using Domain-Driven Design (DDD) pr
 
 ## Architecture Overview
 
-The project follows a three-layer architecture with dependency inversion and type-safe event handling. Domain logic is isolated from infrastructure concerns through the Facade pattern.
+The project follows a three-layer architecture with dependency inversion and type-safe event handling. Domain logic is isolated from infrastructure concerns through the Facade pattern. The domain layer has been successfully migrated from string-based events to a type-safe ADT-based event system.
 
 ## Module Dependencies
 
@@ -105,37 +105,40 @@ The architecture implements Dependency Inversion Principle with Facade Pattern:
 ### Design Patterns
 
 - Hexagonal Architecture: Separation of business logic from infrastructure
-- Facade Pattern: `Domain.Todo.DomainFacade` provides domain interface
+- Facade Pattern: `TodoDomainFacade` type in `Domain.Todo.Aggregate` provides domain interface
 - Event Sourcing: State represented as event sequence
 - CQRS: Command-Query Responsibility Segregation
 - Dependency Injection: Port and Adapter pattern
 - Anti-Corruption Layer: Domain isolation via facades
-- Type Safety: ADT-based event types prevent runtime string errors
+- Type Safety: ADT-based event types (`EventType`) prevent runtime string errors
+- Pattern Matching: Exhaustive compile-time validation through ADT pattern matching
 
 ### Facade Pattern Implementation
 
 The architecture employs dual facades for layer separation:
 
-#### Domain.Todo.DomainFacade
-- Input Types: `TodoCreationRequest`, `TodoUpdateRequest`
-- Output Types: `DomainTodoView`, `DomainEventView`
-- Internal Types: `TodoId`, `TodoText`, `Todo`, `TodoEvent`
+#### Domain.Todo.TodoDomainFacade
+- Input Types: `TaskInitiationRequest`, `TaskUpdateRequest`
+- Output Types: `TaskSnapshot`, `TaskEventRecord`
+- Internal Types: `TaskId`, `TaskDescription`, `Task`, `DomainEvent`
+- Event Types: `EventType` ADT (`TaskInitiated`, `TaskCompleted`, `TaskReopened`, `TaskDeleted`)
 - Functionality: `DTOConversionSupport` for type conversion
-- Responsibilities: Event sourcing, validation, projection
+- Responsibilities: Event sourcing, validation, projection, type-safe event handling
 
 #### Application.DTO.Facade
-- Domain Import: `Domain.Todo.DomainFacade` only
+- Domain Import: `Domain.Todo.Aggregate` only
 - Interface: `DomainOperations` for DTO-based operations
-- Conversion: Utilizes `DomainFacade.dtoConversion`
+- Conversion: Utilizes `TodoDomainFacade.dtoConversion`
 - Purpose: Anti-corruption layer between Application and Domain
 
 ### Layer Responsibilities
 
 - **Domain**: Value Objects, Entities, Events, and Aggregate logic (pure business rules)
-  - Type-safe event sourcing with EventType ADT
+  - Type-safe event sourcing with EventType ADT (`TaskInitiated`, `TaskCompleted`, `TaskReopened`, `TaskDeleted`)
   - Domain validation through smart constructors
   - Business invariant enforcement
-  - Compile-time event type validation
+  - Compile-time event type validation through pattern matching
+  - DomainEvent record type as primary event representation
 - **Application**: Use Cases, DTOs, Port interfaces, and orchestration
   - Service composition through `TodoService`
   - DTO-based external communication
@@ -148,10 +151,10 @@ The architecture employs dual facades for layer separation:
 ## File Structure
 
 ### Domain Layer
-- `src/Domain/Todo/ValueObject.hs` - TodoId, TodoText value objects with smart constructors
-- `src/Domain/Todo/Entity.hs` - Todo entity definition
-- `src/Domain/Todo/Events.hs` - Type-safe domain events with EventType ADT and DomainEvent
-- `src/Domain/Todo/Aggregate.hs` - Aggregate root with V2 type-safe event system
+- `src/Domain/Todo/ValueObject.hs` - TaskId, TaskDescription value objects with smart constructors
+- `src/Domain/Todo/Entity.hs` - Task entity definition
+- `src/Domain/Todo/Events.hs` - Type-safe domain events with EventType ADT and DomainEvent record
+- `src/Domain/Todo/Aggregate.hs` - Aggregate root with DomainEvent-based implementation
 
 ### Application Layer
 - `src/Application/DTO/TodoDTO.hs` - Data Transfer Objects with JSON serialization

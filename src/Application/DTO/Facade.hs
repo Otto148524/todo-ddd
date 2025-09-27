@@ -38,7 +38,7 @@ domainOps :: DomainOperations
 domainOps = DomainOperations
   { createTodoDTO = \todoId' text' timestamp' ->
     let req = TaskInitiationRequest todoId' text' timestamp'
-        facade = getTodoDomainFacade
+        facade = mkTodoDomainFacade
     in case initiateTaskFromRequest facade req of
       Left (InvalidTaskId err) -> Left err
       Left (InvalidTaskDescription err) -> Left err
@@ -53,7 +53,7 @@ domainOps = DomainOperations
           _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , completeTodoDTO = \todoId' timestamp' ->
       let req = TaskUpdateRequest todoId' timestamp'
-          facade = getTodoDomainFacade
+          facade = mkTodoDomainFacade
       in case completeTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
         Left (InvalidTaskDescription err) -> Left err
@@ -68,7 +68,7 @@ domainOps = DomainOperations
             _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , uncompleteTodoDTO = \todoId' timestamp' ->
       let req = TaskUpdateRequest todoId' timestamp'
-          facade = getTodoDomainFacade
+          facade = mkTodoDomainFacade
       in case reopenTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
         Left (InvalidTaskDescription err) -> Left err
@@ -83,7 +83,7 @@ domainOps = DomainOperations
             _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , deleteTodoDTO = \todoId' timestamp' ->
       let req = TaskUpdateRequest todoId' timestamp'
-          facade = getTodoDomainFacade
+          facade = mkTodoDomainFacade
       in case deleteTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
         Left (InvalidTaskDescription err) -> Left err
@@ -97,7 +97,7 @@ domainOps = DomainOperations
             "TaskDeleted" -> Right $ TodoDeletedDTO eid ts
             _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , getAllTodosDTO = \eventDtos ->
-      let facade = getTodoDomainFacade
+      let facade = mkTodoDomainFacade
           -- DTOからDomainViewに変換
           domainViews = map (\case
               TodoCreatedDTO eid txt ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TodoCreated", eid, Just txt, ts)
