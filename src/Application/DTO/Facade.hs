@@ -12,6 +12,7 @@ import Domain.Todo.Aggregate
 import Application.DTO.TodoDTO
 
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Time (UTCTime)
 import qualified Data.Maybe
 
@@ -37,56 +38,66 @@ domainOps :: DomainOperations
 domainOps = DomainOperations
   { createTodoDTO = \todoId' text' timestamp' ->
     let req = TaskInitiationRequest todoId' text' timestamp'
-        facade = mkTodoDomainFacade
+        facade = getTodoDomainFacade
     in case initiateTaskFromRequest facade req of
       Left (InvalidTaskId err) -> Left err
       Left (InvalidTaskDescription err) -> Left err
       Left (DomainLogicError err) -> Left err
       Left (TaskNotFound err) -> Left err
       Right domainEvent ->
-        let domainView = eventToRecords facade domainEvent
+        let domainView = eventToRecord facade domainEvent
             (eventType', eid, mText, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
         in case eventType' of
-          "TodoCreated" -> Right $ TodoCreatedDTO eid (Data.Maybe.fromMaybe "" mText) ts
-          _ -> Left "Unexpected event type"
+          "TodoCreated" -> Right $ TodoCreatedDTO eid (Data.Maybe.fromMaybe "" mText) ts --v2移行完了後消す
+          "TaskInitiated" -> Right $ TodoCreatedDTO eid (Data.Maybe.fromMaybe "" mText) ts
+          _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , completeTodoDTO = \todoId' timestamp' ->
       let req = TaskUpdateRequest todoId' timestamp'
-          facade = mkTodoDomainFacade
+          facade = getTodoDomainFacade
       in case completeTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
         Left (InvalidTaskDescription err) -> Left err
         Left (DomainLogicError err) -> Left err
         Left (TaskNotFound err) -> Left err
         Right domainEvent ->
-          let domainView = eventToRecords facade domainEvent
-              (_, eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
-          in Right $ TodoCompletedDTO eid ts
+          let domainView = eventToRecord facade domainEvent
+              (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
+          in case eventType' of
+            "TodoCompleted" -> Right $ TodoCompletedDTO eid ts
+            "TaskCompleted" -> Right $ TodoCompletedDTO eid ts
+            _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , uncompleteTodoDTO = \todoId' timestamp' ->
       let req = TaskUpdateRequest todoId' timestamp'
-          facade = mkTodoDomainFacade
+          facade = getTodoDomainFacade
       in case reopenTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
         Left (InvalidTaskDescription err) -> Left err
         Left (DomainLogicError err) -> Left err
         Left (TaskNotFound err) -> Left err
         Right domainEvent ->
-          let domainView = eventToRecords facade domainEvent
-              (_, eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
-          in Right $ TodoUncompletedDTO eid ts
+          let domainView = eventToRecord facade domainEvent
+              (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
+          in case eventType' of
+            "TodoUncompleted" -> Right $ TodoUncompletedDTO eid ts
+            "TaskReopened" -> Right $ TodoUncompletedDTO eid ts
+            _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , deleteTodoDTO = \todoId' timestamp' ->
       let req = TaskUpdateRequest todoId' timestamp'
-          facade = mkTodoDomainFacade
+          facade = getTodoDomainFacade
       in case deleteTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
         Left (InvalidTaskDescription err) -> Left err
         Left (DomainLogicError err) -> Left err
         Left (TaskNotFound err) -> Left err
         Right domainEvent ->
-          let domainView = eventToRecords facade domainEvent
-              (_, eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
-          in Right $ TodoDeletedDTO eid ts
+          let domainView = eventToRecord facade domainEvent
+              (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
+          in case eventType' of
+            "TodoDeleted" -> Right $ TodoDeletedDTO eid ts
+            "TaskDeleted" -> Right $ TodoDeletedDTO eid ts
+            _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
   , getAllTodosDTO = \eventDtos ->
-      let facade = mkTodoDomainFacade
+      let facade = getTodoDomainFacade
           -- DTOからDomainViewに変換
           domainViews = map (\case
               TodoCreatedDTO eid txt ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TodoCreated", eid, Just txt, ts)
@@ -95,7 +106,7 @@ domainOps = DomainOperations
               TodoDeletedDTO eid ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TodoDeleted", eid, Nothing, ts)
               ) eventDtos
           -- DomainViewからTodoViewに投影
-          todoViews = projectEventRecordsDirectly facade domainViews
+          todoViews = takeSnapshotsFromEventRecords facade domainViews
           -- TodoViewからDTOに変換
       in map (\view ->
           let (eid, txt, completed') = taskSnapshotToTodoDto (dtoConversion facade) view

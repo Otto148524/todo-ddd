@@ -11,6 +11,13 @@ module Domain.Todo.Aggregate
   , DomainError(..)
   -- DTO変換のためのエクスポート
   , DTOConversionSupport(..)
+  -- ver2用
+  , TaskEventRecordV2(..)
+  , domainEventToRecordV2
+  , eventToRecordsV2
+  , upgradeRecord
+  , downgradeRecord
+  , getTodoDomainFacade
   ) where
 
 import Domain.Todo.Entity
@@ -90,15 +97,15 @@ data TodoDomainFacade = TodoDomainFacade
   , getTaskStatistics :: [TodoEvent] -> (Int, Int, Int) -- (total number of tasks, completed tasks, active tasks)
 
     -- イベント変換
-  , eventToRecords :: TodoEvent -> TaskEventRecord
-  , eventsToRecord :: [TodoEvent] -> [TaskEventRecord]
+  , eventToRecord :: TodoEvent -> TaskEventRecord
+  , eventsToRecords :: [TodoEvent] -> [TaskEventRecord]
 
     -- バリデーション
   , validateTaskId :: String -> Either DomainError TaskId
   , validateTaskDescription :: String -> Either DomainError TaskDescription
 
-    -- TaskEventRecordからTaskSnapshotへの直接変換
-  , projectEventRecordsDirectly :: [TaskEventRecord] -> [TaskSnapshot]
+    -- TaskEventRecordからTaskSnapshotへの変換
+  , takeSnapshotsFromEventRecords :: [TaskEventRecord] -> [TaskSnapshot]
 
     -- DTO変換サポート
   , dtoConversion :: DTOConversionSupport
@@ -132,7 +139,7 @@ mkTodoDomainFacade = TodoDomainFacade
         completedCount' = length $ filter snapshotTaskCompleted tasks
         active = total - completedCount'
     in (total, completedCount', active)
-  , eventToRecords = \case
+  , eventToRecord = \case
       TaskInitiated tid desc timestamp' -> TaskEventRecord
         { recordType = "TodoCreated"
         , recordTaskId = toIdString tid
@@ -157,7 +164,7 @@ mkTodoDomainFacade = TodoDomainFacade
         , recordTaskDescription = Nothing
         , recordTimestamp = timestamp'
         }
-  , eventsToRecord = map (eventToRecords mkTodoDomainFacade)
+  , eventsToRecords = map (eventToRecord mkTodoDomainFacade)
   , validateTaskId = \idStr ->
       case mkTaskId idStr of
         Left err -> Left $ InvalidTaskId err
@@ -168,7 +175,7 @@ mkTodoDomainFacade = TodoDomainFacade
         Left err -> Left $ InvalidTaskDescription err
         Right taskDescription' -> Right taskDescription'
 
-  , projectEventRecordsDirectly = \eventRecords ->
+  , takeSnapshotsFromEventRecords = \eventRecords ->
       let convertRecordToEvent record = case recordType record of
             "TodoCreated" -> case recordTaskDescription record of
               Just desc ->
@@ -241,3 +248,230 @@ projectEvents = foldl' applyEvent Map.empty
       Map.adjust (\t -> t{isCompleted = False}) tid tasks'
     applyEvent tasks' (TaskDeleted tid _) =
       Map.delete tid tasks'
+
+-- === ver2: 型安全な実装（DomainEventベース）===
+
+-- 新しいTaskEventRecord（EventTypeをADTで持つ）
+data TaskEventRecordV2 = TaskEventRecordV2
+  { recordEventTypeV2 :: EventType
+  , recordTaskIdV2 :: String
+  , recordTaskDescriptionV2 :: Maybe String
+  , recordTimestampV2 :: UTCTime
+  } deriving (Show, Eq)
+
+-- DomainEventからV2レコードへ変換
+domainEventToRecordV2 :: DomainEvent -> TaskEventRecordV2
+domainEventToRecordV2 event = TaskEventRecordV2
+  { recordEventTypeV2 = eventType event
+  , recordTaskIdV2 = toIdString (eventTaskId event)
+  , recordTaskDescriptionV2 = fmap toDescString (eventDescription event)
+  , recordTimestampV2 = eventTimestamp event
+  }
+
+-- TodoEventからV2レコードへ（移行用）
+eventToRecordsV2 :: TodoEvent -> TaskEventRecordV2
+eventToRecordsV2 todoEvent = domainEventToRecordV2 (legacyToNewEvent todoEvent)
+
+-- 既存RecordからV2への変換
+upgradeRecord :: TaskEventRecord -> Maybe TaskEventRecordV2
+upgradeRecord old = do
+  evType <- eventTypeFromString (recordType old)
+  return TaskEventRecordV2
+    { recordEventTypeV2 = evType
+    , recordTaskIdV2 = recordTaskId old
+    , recordTaskDescriptionV2 = recordTaskDescription old
+    , recordTimestampV2 = recordTimestamp old
+    }
+
+-- V2から既存Recordへの変換（互換性のため）
+downgradeRecord :: TaskEventRecordV2 -> TaskEventRecord
+downgradeRecord new = TaskEventRecord
+  { recordType = eventTypeToString (recordEventTypeV2 new)
+  , recordTaskId = recordTaskIdV2 new
+  , recordTaskDescription = recordTaskDescriptionV2 new
+  , recordTimestamp = recordTimestampV2 new
+  }
+
+-- V2用のtakeSnapshotsFromEventRecords（ADTパターンマッチで型安全）
+takeSnapshotsFromEventRecordsV2 :: [TaskEventRecordV2] -> [TaskSnapshot]
+takeSnapshotsFromEventRecordsV2 eventRecords =
+  let convertRecordToEvent record = case recordEventTypeV2 record of -- ADTのパターンマッチ
+        EventTaskInitiated ->
+          case recordTaskDescriptionV2 record of
+            Just desc ->
+              let req = TaskInitiationRequest (recordTaskIdV2 record) desc (recordTimestampV2 record)
+              in case initiateTaskFromRequest mkTodoDomainFacade req of
+                Left _ -> Nothing
+                Right event -> Just event
+            Nothing -> Nothing
+        EventTaskCompleted ->
+          let req = TaskUpdateRequest (recordTaskIdV2 record) (recordTimestampV2 record)
+          in case completeTaskFromRequest mkTodoDomainFacade req of
+            Left _ -> Nothing
+            Right event -> Just event
+        EventTaskReopened ->
+          let req = TaskUpdateRequest (recordTaskIdV2 record) (recordTimestampV2 record)
+          in case reopenTaskFromRequest mkTodoDomainFacade req of
+            Left _ -> Nothing
+            Right event -> Just event
+        EventTaskDeleted ->
+          let req = TaskUpdateRequest (recordTaskIdV2 record) (recordTimestampV2 record)
+          in case deleteTaskFromRequest mkTodoDomainFacade req of
+            Left _ -> Nothing
+            Right event -> Just event
+      events = mapMaybe convertRecordToEvent eventRecords
+      in projectEventsToSnapshots mkTodoDomainFacade events
+
+-- 新しいファサード（将来のメイン実装）
+mkTodoDomainFacadeV2 :: TodoDomainFacade
+mkTodoDomainFacadeV2 = mkTodoDomainFacade
+  { -- Task作成(to todoEvent)
+    initiateTaskFromRequest = \req -> do
+      domainEvent <- initiateTaskV2 req
+      case newToLegacyEvent domainEvent of
+        Just todoEvent -> Right todoEvent
+        Nothing -> Left $ DomainLogicError "Failed to convert DomainEvent to TodoEvent"
+    -- Task状態変更（to todoEvent）
+  , completeTaskFromRequest = \req -> do
+    domainEvent <- completeTaskV2 req
+    case newToLegacyEvent domainEvent of
+      Just todoEvent -> Right todoEvent
+      Nothing -> Left $ DomainLogicError "Failed to convert DomainEvent to TodoEvent"
+
+  , reopenTaskFromRequest = \req -> do
+    domainEvent <- reopenTaskV2 req
+    case newToLegacyEvent domainEvent of
+      Just todoEvent -> Right todoEvent
+      Nothing -> Left $ DomainLogicError "Failed to convert DomainEvent to  TodoEvent"
+  , deleteTaskFromRequest = \req -> do
+    domainEvent <- deleteTaskV2 req
+    case newToLegacyEvent domainEvent of
+      Just todoEvent -> Right todoEvent
+      Nothing -> Left $ DomainLogicError "Failed to convert DomainEvent to TodoEvent"
+    -- イベント投影とクエリ
+  , projectEventsToSnapshots = Map.elems . Map.map taskToSnapshot . projectEvents
+  , findTaskById = \targetId events ->
+      let tasks = projectEventsToSnapshots mkTodoDomainFacadeV2 events
+      in case filter (\t -> snapshotTaskId t == targetId) tasks of
+        (task:_) -> Just task
+        [] -> Nothing
+  , getTaskStatistics = \events ->
+      let tasks = projectEventsToSnapshots mkTodoDomainFacadeV2 events
+          total = length tasks
+          completedCount' = length $ filter snapshotTaskCompleted tasks
+          active = total - completedCount'
+      in (total, completedCount', active)
+    -- TodoEvent変換
+  , eventToRecord = downgradeRecord . eventToRecordsV2
+  , eventsToRecords = map (downgradeRecord . eventToRecordsV2)
+
+    -- validation
+  , validateTaskId = \idStr ->
+      case mkTaskId idStr of
+        Left err -> Left $ InvalidTaskId err
+        Right taskId' -> Right taskId'
+
+  , validateTaskDescription = \descStr ->
+      case mkTaskDescription descStr of
+        Left err -> Left $ InvalidTaskDescription err
+        Right taskDescription' -> Right taskDescription'
+    -- TaskEventRecordからTaskSnapshotへの変換
+  , takeSnapshotsFromEventRecords = \eventRecords ->
+      let v2Records = mapMaybe upgradeRecord eventRecords
+      in takeSnapshotsFromEventRecordsV2 v2Records
+    -- DTO変換サポートの実装
+  , dtoConversion = DTOConversionSupport
+      { todoDtoToTaskSnapshot = \(id', desc', isCompleted') ->
+          TaskSnapshot
+            { snapshotTaskId = id'
+            , snapshotTaskDescription = desc'
+            , snapshotTaskCompleted = isCompleted'
+            }
+      , taskSnapshotToTodoDto = \snapshot ->
+        (snapshotTaskId snapshot, snapshotTaskDescription snapshot, snapshotTaskCompleted snapshot)
+      , todoEventDtoToTaskEventRecord = \(eventType', todoId', desc, timestamp') ->
+          case eventTypeFromString eventType' of
+            Just et ->
+              downgradeRecord $ TaskEventRecordV2
+                { recordEventTypeV2 = et
+                , recordTaskIdV2 = todoId'
+                , recordTaskDescriptionV2 = desc
+                , recordTimestampV2 = timestamp'
+                }
+            Nothing -> error $ "Invalid event type in DTO: " ++ eventType' ++ ". Migration to V2 required."
+      , taskEventRecordToTodoEventDto = \record ->
+          case upgradeRecord record of
+            Just v2Record ->
+              ( eventTypeToString (recordEventTypeV2 v2Record)
+              , recordTaskIdV2 v2Record
+              , recordTaskDescriptionV2 v2Record
+              , recordTimestampV2 v2Record
+              )
+            Nothing -> error $ "Failed to upgrade TaskEventRecord with type: " ++ recordType record ++ ". Invalid event type."
+      , statisticsTupleToDto = id -- (Int, Int, Int) -> (Int, Int, Int)
+      }
+  }
+
+-- フィーチャーフラグ（切り替え用）
+useV2Implementation :: Bool
+useV2Implementation = True -- 移行可能になったらTrueに変える
+
+-- 切り替え可能なファサード
+getTodoDomainFacade :: TodoDomainFacade
+getTodoDomainFacade = if useV2Implementation
+  then mkTodoDomainFacadeV2
+  else mkTodoDomainFacade
+
+-- V2用のヘルパー関数
+initiateTaskV2 :: TaskInitiationRequest -> Either DomainError DomainEvent
+initiateTaskV2 req = do
+  taskId' <- case mkTaskId (initiationTaskId req) of
+    Left err -> Left $ InvalidTaskId err
+    Right tid -> Right tid
+  taskDescription' <- case mkTaskDescription (initiationTaskDescription req) of
+    Left err -> Left $ InvalidTaskDescription err
+    Right desc -> Right desc
+  return $ DomainEvent
+    { eventType = EventTaskInitiated
+    , eventTaskId = taskId'
+    , eventDescription = Just taskDescription'
+    , eventTimestamp = initiationTimestamp req
+    }
+
+completeTaskV2 :: TaskUpdateRequest -> Either DomainError DomainEvent
+completeTaskV2 req = do
+  taskId' <- case mkTaskId (updateTaskId req) of
+    Left err -> Left $ InvalidTaskId err
+    Right tid -> Right tid
+  return $ DomainEvent
+    { eventType = EventTaskCompleted
+    , eventTaskId = taskId'
+    , eventDescription = Nothing
+    , eventTimestamp = updateTimestamp req
+    }
+
+reopenTaskV2 :: TaskUpdateRequest -> Either DomainError DomainEvent
+reopenTaskV2 req = do
+  taskId' <- case mkTaskId (updateTaskId req) of
+    Left err -> Left $ InvalidTaskId err
+    Right tid -> Right tid
+  return $ DomainEvent
+    { eventType = EventTaskReopened
+    , eventTaskId = taskId'
+    , eventDescription = Nothing
+    , eventTimestamp = updateTimestamp req
+    }
+
+deleteTaskV2 :: TaskUpdateRequest -> Either DomainError DomainEvent
+deleteTaskV2 req = do
+  taskId' <- case mkTaskId (updateTaskId req) of
+    Left err -> Left $ InvalidTaskId err
+    Right tid -> Right tid
+  return $ DomainEvent
+    { eventType = EventTaskDeleted
+    , eventTaskId = taskId'
+    , eventDescription = Nothing
+    , eventTimestamp = updateTimestamp req
+    }
+
+
