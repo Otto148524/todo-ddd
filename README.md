@@ -4,7 +4,7 @@ Haskell implementation of a Todo application using Domain-Driven Design (DDD) pr
 
 ## Architecture Overview
 
-The project follows a three-layer architecture with dependency inversion. Domain logic is isolated from infrastructure concerns through the Facade pattern.
+The project follows a three-layer architecture with dependency inversion and type-safe event handling. Domain logic is isolated from infrastructure concerns through the Facade pattern.
 
 ## Module Dependencies
 
@@ -110,6 +110,7 @@ The architecture implements Dependency Inversion Principle with Facade Pattern:
 - CQRS: Command-Query Responsibility Segregation
 - Dependency Injection: Port and Adapter pattern
 - Anti-Corruption Layer: Domain isolation via facades
+- Type Safety: ADT-based event types prevent runtime string errors
 
 ### Facade Pattern Implementation
 
@@ -128,19 +129,13 @@ The architecture employs dual facades for layer separation:
 - Conversion: Utilizes `DomainFacade.dtoConversion`
 - Purpose: Anti-corruption layer between Application and Domain
 
-#### Implementation Results
-```haskell
--- Application.DTO.TodoDTO imports no domain modules
--- Application.DTO.Facade imports only DomainFacade
--- All DTO-Domain conversions occur within DomainFacade boundary
-```
-
 ### Layer Responsibilities
 
 - **Domain**: Value Objects, Entities, Events, and Aggregate logic (pure business rules)
-  - Event sourcing implementation through `projectEvents` function
+  - Type-safe event sourcing with EventType ADT
   - Domain validation through smart constructors
   - Business invariant enforcement
+  - Compile-time event type validation
 - **Application**: Use Cases, DTOs, Port interfaces, and orchestration
   - Service composition through `TodoService`
   - DTO-based external communication
@@ -155,8 +150,8 @@ The architecture employs dual facades for layer separation:
 ### Domain Layer
 - `src/Domain/Todo/ValueObject.hs` - TodoId, TodoText value objects with smart constructors
 - `src/Domain/Todo/Entity.hs` - Todo entity definition
-- `src/Domain/Todo/Events.hs` - Domain events (Created, Completed, Uncompleted, Deleted)
-- `src/Domain/Todo/Aggregate.hs` - Aggregate root with domain logic and consistency boundary
+- `src/Domain/Todo/Events.hs` - Type-safe domain events with EventType ADT and DomainEvent
+- `src/Domain/Todo/Aggregate.hs` - Aggregate root with V2 type-safe event system
 
 ### Application Layer
 - `src/Application/DTO/TodoDTO.hs` - Data Transfer Objects with JSON serialization
