@@ -2,7 +2,7 @@ module Application.Ports.EventStorePort
   ( EventStore(..)
   ) where
 
-import Application.DTO.TodoDTO
+import Application.DTO.TaskDTO
 
 class (Monad m) => EventStore m where
   appendEventDto :: TodoEventDTO -> m ()

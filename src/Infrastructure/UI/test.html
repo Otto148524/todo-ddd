@@ -117,11 +117,11 @@
       cursor: not-allowed;
     }
 
-    .todo-list {
+    .task-list {
       list-style: none;
     }
 
-    .todo-item {
+    .task-item {
       display: flex;
       align-items: center;
       padding: 15px;
@@ -145,34 +145,34 @@
       }
     }
 
-    .todo-item:hover {
+    .task-item:hover {
       border-color: #667eea;
       box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
     }
 
-    .todo-item.completed {
+    .task-item.completed {
       opacity: 0.6;
     }
 
-    .todo-item.completed .todo-text {
+    .task-item.completed .task-desc {
       text-decoration: line-through;
       color: #999;
     }
 
-    .todo-checkbox {
+    .task-checkbox {
       width: 24px;
       height: 24px;
       margin-right: 15px;
       cursor: pointer;
     }
 
-    .todo-text {
+    .task-desc {
       flex: 1;
       font-size: 16px;
       color: #333;
     }
 
-    .todo-delete {
+    .task-delete {
       padding: 8px 15px;
       background: #ff4757;
       color: white;
@@ -183,7 +183,7 @@
       transition: background 0.3s;
     }
 
-    .todo-delete:hover {
+    .task-delete:hover {
       background: #ff3838;
     }
 
@@ -275,7 +275,7 @@
 <body>
   <div class="container">
     <div class="main-panel">
-      <h1>📝 Todo App (Haskell Backend)</h1>
+      <h1>Todo App (Haskell Backend)</h1>
 
       <div class="connection-status" id="connectionStatus">
         Connecting to server...
@@ -297,16 +297,16 @@
       </div>
 
       <div class="input-group">
-        <input type="text" id="todoInput" placeholder="新しいタスクを入力..." />
+        <input type="text" id="taskInput" placeholder="新しいタスクを入力..." />
         <button id="addButton">追加</button>
       </div>
 
       <div id="errorContainer"></div>
-      <ul class="todo-list" id="todoList"></ul>
+      <ul class="task-list" id="taskList"></ul>
     </div>
 
     <div class="event-panel">
-      <h2>📊 Event History</h2>
+      <h2>Event History</h2>
       <div id="eventHistory"></div>
     </div>
   </div>
@@ -321,10 +321,10 @@
         this.baseURL = baseURL;
       }
 
-      async fetchTodos() {
+      async fetchTasks() {
         try {
-          const response = await fetch(`${this.baseURL}/todos`);
-          if (!response.ok) throw new Error('Failed to fetch todos');
+          const response = await fetch(`${this.baseURL}/tasks`);
+          if (!response.ok) throw new Error('Failed to fetch tasks');
           return await response.json();
         } catch (error) {
           console.error('Fetch error:', error);
@@ -332,16 +332,16 @@
         }
       }
 
-      async createTodo(text) {
+      async initiateTask(desc) {
         try {
-          const response = await fetch(`${this.baseURL}/todos`, {
+          const response = await fetch(`${this.baseURL}/tasks`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ requestText: text })
+            body: JSON.stringify({ requestText: desc })
           });
-          if (!response.ok) throw new Error('Failed to create todo');
+          if (!response.ok) throw new Error('Failed to initiate a task');
           return await response.json();
         } catch (error) {
           console.error('Create error:', error);
@@ -349,32 +349,32 @@
         }
       }
 
-      async toggleTodo(id) {
+      async toggleTask(id) {
         try {
-          const response = await fetch(`${this.baseURL}/todos/toggle`, {
+          const response = await fetch(`${this.baseURL}/tasks/toggle`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ toggleId: id })
           });
-          if (!response.ok) throw new Error('Failed to toggle todo');
+          if (!response.ok) throw new Error('Failed to toggle a task');
         } catch (error) {
           console.error('Toggle error:', error);
           throw error;
         }
       }
 
-      async deleteTodo(id) {
+      async deleteTask(id) {
         try {
-          const response = await fetch(`${this.baseURL}/todos/delete`, {
+          const response = await fetch(`${this.baseURL}/tasks/delete`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ deleteId: id })
           });
-          if (!response.ok) throw new Error('Failed to delete todo');
+          if (!response.ok) throw new Error('Failed to delete a task');
         } catch (error) {
           console.error('Delete error:', error);
           throw error;
@@ -400,8 +400,8 @@
     class TodoUI {
       constructor() {
         this.apiClient = new TodoAPIClient();
-        this.todoList = document.getElementById('todoList');
-        this.todoInput = document.getElementById('todoInput');
+        this.taskList = document.getElementById('taskList');
+        this.taskInput = document.getElementById('taskInput');
         this.addButton = document.getElementById('addButton');
         this.totalCount = document.getElementById('totalCount');
         this.activeCount = document.getElementById('activeCount');
@@ -419,7 +419,7 @@
 
       setupEventListeners() {
         this.addButton.addEventListener('click', () => this.handleAdd());
-        this.todoInput.addEventListener('keypress', (e) => {
+        this.taskInput.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') this.handleAdd();
         });
       }
@@ -458,13 +458,13 @@
       }
 
       async handleAdd() {
-        const text = this.todoInput.value.trim();
-        if (!text) return;
+        const desc = this.taskInput.value.trim();
+        if (!desc) return;
 
         try {
           this.addButton.disabled = true;
-          await this.apiClient.createTodo(text);
-          this.todoInput.value = '';
+          await this.apiClient.initiateTask(desc);
+          this.taskInput.value = '';
           await this.refresh();
         } catch (error) {
           this.showError('タスクの追加に失敗しました');
@@ -475,7 +475,7 @@
 
       async handleToggle(id) {
         try {
-          await this.apiClient.toggleTodo(id);
+          await this.apiClient.toggleTask(id);
           await this.refresh();
         } catch (error) {
           this.showError('タスクの更新に失敗しました');
@@ -484,7 +484,7 @@
 
       async handleDelete(id) {
         try {
-          await this.apiClient.deleteTodo(id);
+          await this.apiClient.deleteTask(id);
           await this.refresh();
         } catch (error) {
           this.showError('タスクの削除に失敗しました');
@@ -494,8 +494,8 @@
       async refresh() {
         try {
           // Fetch todos and statistics
-          const data = await this.apiClient.fetchTodos();
-          this.renderTodos(data.todos);
+          const data = await this.apiClient.fetchTasks();
+          this.renderTasks(data.tasks);
           this.updateStatistics(data.statistics);
 
           // Fetch and render events
@@ -509,33 +509,33 @@
         }
       }
 
-      renderTodos(todos) {
-        this.todoList.innerHTML = '';
+      renderTasks(tasks) {
+        this.taskList.innerHTML = '';
 
-        todos.forEach(todo => {
+        tasks.forEach(task => {
           const li = document.createElement('li');
-          li.className = `todo-item ${todo.completed ? 'completed' : ''}`;
+          li.className = `task-item ${task.isCompleted ? 'completed' : ''}`;
 
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
-          checkbox.className = 'todo-checkbox';
-          checkbox.checked = todo.completed;
-          checkbox.addEventListener('change', () => this.handleToggle(todo.todoId));
+          checkbox.className = 'task-checkbox';
+          checkbox.checked = task.isCompleted;
+          checkbox.addEventListener('change', () => this.handleToggle(task.taskId));
 
           const text = document.createElement('span');
-          text.className = 'todo-text';
-          text.textContent = todo.text;
+          text.className = 'task-desc';
+          text.textContent = task.desc;
 
           const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'todo-delete';
+          deleteBtn.className = 'task-delete';
           deleteBtn.textContent = '削除';
-          deleteBtn.addEventListener('click', () => this.handleDelete(todo.todoId));
+          deleteBtn.addEventListener('click', () => this.handleDelete(task.taskId));
 
           li.appendChild(checkbox);
           li.appendChild(text);
           li.appendChild(deleteBtn);
 
-          this.todoList.appendChild(li);
+          this.taskList.appendChild(li);
         });
       }
 
@@ -555,12 +555,12 @@
 
           eventDiv.appendChild(typeDiv);
 
-          if (event.text) {
+          if (event.desc) {
             const dataDiv = document.createElement('div');
             dataDiv.className = 'event-data';
             dataDiv.textContent = JSON.stringify({
               id: event.id,
-              text: event.text
+              desc: event.desc
             }, null, 2);
             eventDiv.appendChild(dataDiv);
           }
@@ -578,7 +578,7 @@
       updateStatistics(stats) {
         this.totalCount.textContent = stats.totalCount;
         this.activeCount.textContent = stats.activeCount;
-        this.completedCount.textContent = stats.completedCount;
+        this.completedCount.textContent = stats.isCompletedCount;
       }
 
       startPolling() {

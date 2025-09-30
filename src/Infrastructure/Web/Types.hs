@@ -3,38 +3,38 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Infrastructure.Web.Types
-  ( CreateTodoRequest(..)
-  , CreateTodoResponse(..)
-  , TodosResponse(..)
+  ( InitiateTaskRequest(..)
+  , InitiateTaskResponse(..)
+  , TasksResponse(..)
   , ToggleRequest(..)
   , DeleteRequest(..)
   , TodoAPI
   ) where
 
-import Application.DTO.TodoDTO
+import Application.DTO.TaskDTO
 
 import Data.Aeson
 import GHC.Generics
 import Servant
 
-newtype CreateTodoRequest = CreateTodoRequest
+newtype InitiateTaskRequest = InitiateTaskRequest
   { requestText :: String
   } deriving (Generic)
 
-instance FromJSON CreateTodoRequest
+instance FromJSON InitiateTaskRequest
 
-newtype CreateTodoResponse = CreateTodoResponse
+newtype InitiateTaskResponse = InitiateTaskResponse
   { createId :: String
   } deriving (Generic)
 
-instance ToJSON CreateTodoResponse
+instance ToJSON InitiateTaskResponse
 
-data TodosResponse = TodosResponse
-  { todos :: [TodoDTO]
-  , statistics :: TodoStatisticsDTO
+data TasksResponse = TasksResponse
+  { tasks :: [TaskDTO]
+  , statistics :: TasksStatisticsDTO
   } deriving (Generic)
 
-instance ToJSON TodosResponse
+instance ToJSON TasksResponse
 
 newtype ToggleRequest = ToggleRequest
   { toggleId :: String
@@ -49,10 +49,10 @@ newtype DeleteRequest = DeleteRequest
 instance FromJSON DeleteRequest
 
 type TodoAPI =
-  "api" :> "todos" :> Get '[JSON] TodosResponse
-  :<|> "api" :> "todos" :> ReqBody '[JSON] CreateTodoRequest :> Post '[JSON] CreateTodoResponse
-  :<|> "api" :> "todos" :> "toggle" :> ReqBody '[JSON] ToggleRequest :> Post '[JSON] NoContent
-  :<|> "api" :> "todos" :> "delete" :> ReqBody '[JSON] DeleteRequest :> Post '[JSON] NoContent
+  "api" :> "tasks" :> Get '[JSON] TasksResponse
+  :<|> "api" :> "tasks" :> ReqBody '[JSON] InitiateTaskRequest :> Post '[JSON] InitiateTaskResponse
+  :<|> "api" :> "tasks" :> "toggle" :> ReqBody '[JSON] ToggleRequest :> Post '[JSON] NoContent
+  :<|> "api" :> "tasks" :> "delete" :> ReqBody '[JSON] DeleteRequest :> Post '[JSON] NoContent
   :<|> "api" :> "events" :> Get '[JSON] [TodoEventDTO]
 
 

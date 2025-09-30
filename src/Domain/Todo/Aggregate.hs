@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Domain.Todo.Aggregate
   ( TodoDomainFacade(..)
   , mkTodoDomainFacade
@@ -13,17 +10,14 @@ module Domain.Todo.Aggregate
   , DTOConversionSupport(..)
   ) where
 
-import Domain.Todo.Entity
+
 import Domain.Todo.Events
 import Domain.Todo.ValueObject
+import Domain.Todo.DomainService
 
 import Data.Text (Text)
 import Data.Time (UTCTime)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 import Data.Maybe (mapMaybe)
-import Data.List (foldl')
-
 
 
 -- Domain Error Types
@@ -34,13 +28,6 @@ data DomainError
   | TaskNotFound Text
   | DomainLogicError Text
   deriving (Show, Eq)
-
--- 外部向けのスナップショット型（DTOの代わり）
-data TaskSnapshot = TaskSnapshot
-  { snapshotTaskId :: String
-  , snapshotTaskDescription :: String
-  , snapshotTaskCompleted :: Bool
-  } deriving (Show, Eq)
 
 data TaskEventRecord= TaskEventRecord
   { recordType :: String
@@ -76,29 +63,27 @@ data DTOConversionSupport = DTOConversionSupport
 
 -- 統一インターフェース
 data TodoDomainFacade = TodoDomainFacade
-  { -- Task作成
-    initiateTaskFromRequest :: TaskInitiationRequest -> Either DomainError TodoEvent
-
-    -- Task状態変更
-  , completeTaskFromRequest :: TaskUpdateRequest -> Either DomainError TodoEvent
-  , reopenTaskFromRequest :: TaskUpdateRequest -> Either DomainError TodoEvent
-  , deleteTaskFromRequest :: TaskUpdateRequest -> Either DomainError TodoEvent
+  { -- Command Handlers
+    initiateTaskFromRequest :: TaskInitiationRequest -> Either DomainError DomainEvent
+  , completeTaskFromRequest :: TaskUpdateRequest -> Either DomainError DomainEvent
+  , reopenTaskFromRequest :: TaskUpdateRequest -> Either DomainError DomainEvent
+  , deleteTaskFromRequest :: TaskUpdateRequest -> Either DomainError DomainEvent
 
     -- イベント投影とクエリ
-  , projectEventsToSnapshots :: [TodoEvent] -> [TaskSnapshot]
-  , findTaskById :: String -> [TodoEvent] -> Maybe TaskSnapshot
-  , getTaskStatistics :: [TodoEvent] -> (Int, Int, Int) -- (total number of tasks, completed tasks, active tasks)
+  , projectEventsToSnapshots :: [DomainEvent] -> [TaskSnapshot]
+  , findTaskById :: String -> [DomainEvent] -> Maybe TaskSnapshot
+  , getTaskStatistics :: [DomainEvent] -> TaskStatistics
 
     -- イベント変換
-  , eventToRecords :: TodoEvent -> TaskEventRecord
-  , eventsToRecord :: [TodoEvent] -> [TaskEventRecord]
+  , eventToRecord :: DomainEvent -> TaskEventRecord
+  , eventsToRecords :: [DomainEvent] -> [TaskEventRecord]
 
     -- バリデーション
   , validateTaskId :: String -> Either DomainError TaskId
   , validateTaskDescription :: String -> Either DomainError TaskDescription
 
-    -- TaskEventRecordからTaskSnapshotへの直接変換
-  , projectEventRecordsDirectly :: [TaskEventRecord] -> [TaskSnapshot]
+    -- TaskEventRecordからTaskSnapshotへの変換
+  , takeSnapshotsFromEventRecords :: [TaskEventRecord] -> [TaskSnapshot]
 
     -- DTO変換サポート
   , dtoConversion :: DTOConversionSupport
@@ -110,54 +95,26 @@ mkTodoDomainFacade = TodoDomainFacade
   { initiateTaskFromRequest = \req -> do
       taskId' <- validateTaskId mkTodoDomainFacade (initiationTaskId req)
       taskDescription' <- validateTaskDescription mkTodoDomainFacade (initiationTaskDescription req)
-      return $ TaskInitiated taskId' taskDescription' (initiationTimestamp req)
-  , completeTaskFromRequest = \req -> do
-      taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
-      return $ TaskCompleted taskId' (updateTimestamp req)
-  , reopenTaskFromRequest = \req -> do
-      taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
-      return $ TaskReopened taskId' (updateTimestamp req)
-  , deleteTaskFromRequest = \req -> do
-      taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
-      return $ TaskDeleted taskId' (updateTimestamp req)
-  , projectEventsToSnapshots = Map.elems . Map.map taskToSnapshot . projectEvents
-  , findTaskById = \targetId events ->
-      let tasks = projectEventsToSnapshots mkTodoDomainFacade events
-      in case filter (\t -> snapshotTaskId t == targetId) tasks of
-        (task:_) -> Just task
-        [] -> Nothing
-  , getTaskStatistics = \events ->
-    let tasks = projectEventsToSnapshots mkTodoDomainFacade events
-        total = length tasks
-        completedCount' = length $ filter snapshotTaskCompleted tasks
-        active = total - completedCount'
-    in (total, completedCount', active)
-  , eventToRecords = \case
-      TaskInitiated tid desc timestamp' -> TaskEventRecord
-        { recordType = "TodoCreated"
-        , recordTaskId = toIdString tid
-        , recordTaskDescription = Just $ toDescString desc
-        , recordTimestamp = timestamp'
+      return $ DomainEvent
+        { eventType = TaskInitiated
+        , eventTaskId = taskId'
+        , eventDescription = Just taskDescription'
+        , eventTimestamp = initiationTimestamp req
         }
-      TaskCompleted tid timestamp' -> TaskEventRecord
-        { recordType = "TodoCompleted"
-        , recordTaskId = toIdString tid
-        , recordTaskDescription = Nothing
-        , recordTimestamp = timestamp'
-        }
-      TaskReopened tid timestamp' -> TaskEventRecord
-        { recordType = "TodoUncompleted"
-        , recordTaskId = toIdString tid
-        , recordTaskDescription = Nothing
-        , recordTimestamp = timestamp'
-        }
-      TaskDeleted tid timestamp' -> TaskEventRecord
-        { recordType = "TodoDeleted"
-        , recordTaskId = toIdString tid
-        , recordTaskDescription = Nothing
-        , recordTimestamp = timestamp'
-        }
-  , eventsToRecord = map (eventToRecords mkTodoDomainFacade)
+  , completeTaskFromRequest = mkTaskUpdateEvent TaskCompleted
+  , reopenTaskFromRequest = mkTaskUpdateEvent TaskReopened
+  , deleteTaskFromRequest = mkTaskUpdateEvent TaskDeleted
+  -- DomainService
+  , projectEventsToSnapshots = projectToSnapshots
+  , findTaskById = findTaskInProjection
+  , getTaskStatistics = takeStatistics
+  , eventToRecord = \domainEvent -> TaskEventRecord
+      { recordType = eventTypeToString (eventType domainEvent)
+      , recordTaskId = toIdString (eventTaskId domainEvent)
+      , recordTaskDescription = fmap toDescString (eventDescription domainEvent)
+      , recordTimestamp = eventTimestamp domainEvent
+      }
+  , eventsToRecords = map (eventToRecord mkTodoDomainFacade)
   , validateTaskId = \idStr ->
       case mkTaskId idStr of
         Left err -> Left $ InvalidTaskId err
@@ -168,47 +125,44 @@ mkTodoDomainFacade = TodoDomainFacade
         Left err -> Left $ InvalidTaskDescription err
         Right taskDescription' -> Right taskDescription'
 
-  , projectEventRecordsDirectly = \eventRecords ->
-      let convertRecordToEvent record = case recordType record of
-            "TodoCreated" -> case recordTaskDescription record of
-              Just desc ->
-                let req = TaskInitiationRequest (recordTaskId record) desc (recordTimestamp record)
-                in case initiateTaskFromRequest mkTodoDomainFacade req of
-                  Left _ -> Nothing
-                  Right event -> Just event
-              Nothing -> Nothing
-            "TodoCompleted" ->
-              let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
-              in case completeTaskFromRequest mkTodoDomainFacade req of
-                Left _ -> Nothing
-                Right event -> Just event
-            "TodoUncompleted" ->
-              let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
-              in case reopenTaskFromRequest mkTodoDomainFacade req of
-                Left _ -> Nothing
-                Right event -> Just event
-            "TodoDeleted" ->
-              let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
-              in case deleteTaskFromRequest mkTodoDomainFacade req of
-                Left _ -> Nothing
-                Right event -> Just event
-            _ -> Nothing
-          events = mapMaybe convertRecordToEvent eventRecords
-          in projectEventsToSnapshots mkTodoDomainFacade events
+  , takeSnapshotsFromEventRecords = \eventRecords ->
+      let -- TaskUpdate系イベントの変換を抽象化
+          convertTaskUpdateEvent handler record =
+            let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
+            in case handler req of
+              Left _ -> Nothing
+              Right domainEvent -> Just domainEvent
+
+          convertRecordToDomainEvent record = do
+            evType <- eventTypeFromString (recordType record)
+            case evType of
+              TaskInitiated -> case recordTaskDescription record of
+                Just desc ->
+                  let req = TaskInitiationRequest (recordTaskId record) desc (recordTimestamp record)
+                  in case initiateTaskFromRequest mkTodoDomainFacade req of
+                    Left _ -> Nothing
+                    Right domainEvent -> Just domainEvent
+                Nothing -> Nothing
+              TaskCompleted -> convertTaskUpdateEvent (completeTaskFromRequest mkTodoDomainFacade) record
+              TaskReopened -> convertTaskUpdateEvent (reopenTaskFromRequest mkTodoDomainFacade) record
+              TaskDeleted -> convertTaskUpdateEvent (deleteTaskFromRequest mkTodoDomainFacade) record
+
+          domainEvents = mapMaybe convertRecordToDomainEvent eventRecords
+          in projectEventsToSnapshots mkTodoDomainFacade domainEvents
 
     -- DTO変換サポートの実装
   , dtoConversion = DTOConversionSupport
       { todoDtoToTaskSnapshot = \(id', desc', isCompleted') ->
           TaskSnapshot
             { snapshotTaskId = id'
-            , snapshotTaskDescription = desc'
-            , snapshotTaskCompleted = isCompleted'
+            , snapshotTaskDesc = desc'
+            , snapshotTaskIsCompleted = isCompleted'
             }
       , taskSnapshotToTodoDto = \snapshot ->
-        (snapshotTaskId snapshot, snapshotTaskDescription snapshot, snapshotTaskCompleted snapshot)
-      , todoEventDtoToTaskEventRecord = \(eventType', todoId', desc, timestamp') -> TaskEventRecord
+        (snapshotTaskId snapshot, snapshotTaskDesc snapshot, snapshotTaskIsCompleted snapshot)
+      , todoEventDtoToTaskEventRecord = \(eventType', taskId', desc, timestamp') -> TaskEventRecord
           { recordType = eventType'
-          , recordTaskId = todoId'
+          , recordTaskId = taskId'
           , recordTaskDescription = desc
           , recordTimestamp= timestamp'
           }
@@ -218,26 +172,13 @@ mkTodoDomainFacade = TodoDomainFacade
       }
   }
 
--- 内部ヘルパー関数
-
--- TaskエンティティをTaskSnapshotに変換する関数
-taskToSnapshot :: Task -> TaskSnapshot
-taskToSnapshot task = TaskSnapshot
-  { snapshotTaskId = toIdString (taskId task)
-  , snapshotTaskDescription = toDescString (taskDescription task)
-  , snapshotTaskCompleted = isCompleted task
-  }
-
--- 元々Aggregate.hsにあったものを移してきた
-projectEvents :: [TodoEvent] -> Map TaskId Task
-projectEvents = foldl' applyEvent Map.empty
-  where
-    applyEvent :: Map TaskId Task -> TodoEvent -> Map TaskId Task
-    applyEvent tasks' (TaskInitiated tid desc _) =
-      Map.insert tid (Task tid desc False) tasks'
-    applyEvent tasks' (TaskCompleted tid _) =
-      Map.adjust (\t -> t{isCompleted = True}) tid tasks'
-    applyEvent tasks' (TaskReopened tid _) =
-      Map.adjust (\t -> t{isCompleted = False}) tid tasks'
-    applyEvent tasks' (TaskDeleted tid _) =
-      Map.delete tid tasks'
+-- fromRequest抽象化
+mkTaskUpdateEvent :: EventType -> TaskUpdateRequest -> Either DomainError DomainEvent
+mkTaskUpdateEvent eventType' req = do
+  taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
+  return $ DomainEvent
+    { eventType = eventType'
+    , eventTaskId = taskId'
+    , eventDescription = Nothing
+    , eventTimestamp = updateTimestamp req
+    }

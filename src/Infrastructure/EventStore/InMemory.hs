@@ -12,7 +12,7 @@ module Infrastructure.EventStore.InMemory
   , initializeApp
   ) where
 
-import Application.DTO.TodoDTO
+import Application.DTO.TaskDTO
 import Application.Ports.EventStorePort
 import Application.Ports.NotificationPort
 

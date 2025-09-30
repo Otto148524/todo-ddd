@@ -45,7 +45,8 @@ library:
   - Domain.Todo.Entity
   - Domain.Todo.Events
   - Domain.Todo.Aggregate
-  - Application.DTO.TodoDTO
+  - Domain.Todo.DomainService
+  - Application.DTO.TaskDTO
   - Application.Ports.EventStorePort
   - Application.Ports.NotificationPort
   - Application.DTO.Facade
