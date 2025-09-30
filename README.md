@@ -251,6 +251,46 @@ cabal run todo-ddd-exe
 cabal repl
 ```
 
+## User Interface
+
+The project includes a React-based web UI built with Vite, TypeScript, and TailwindCSS.
+
+### Starting the Application
+
+**Backend (Haskell API Server)**
+```bash
+cd /work/todo-ddd
+cabal run todo-ddd-exe
+# Server starts on http://localhost:8080
+```
+
+**Frontend (React UI)**
+```bash
+cd /work/todo-ddd/src/Infrastructure/UI
+npm install  # First time only
+npm run dev
+# UI available at http://localhost:5173
+```
+
+### UI Features
+
+- Task creation with Enter key support
+- Task completion toggle via checkbox
+- Task deletion
+- Real-time statistics display (Total/Active/Completed)
+- Event history visualization panel
+- Connection status indicator
+- Auto-refresh every 2 seconds via polling
+
+### UI Technical Stack
+
+- **Vite**: Build tool with fast HMR
+- **React 18**: UI framework with TypeScript
+- **TailwindCSS**: Utility-first styling
+- **Type-safe API client**: Matches Haskell DTOs
+
+See [src/Infrastructure/UI/README.md](src/Infrastructure/UI/README.md) for UI development details.
+
 ## API Endpoints
 
 The REST API provides the following endpoints:

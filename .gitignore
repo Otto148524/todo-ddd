@@ -1,3 +1,12 @@
+# Haskell
 /dist-newstyle/
 *.local
+
+# macOS
 .DS_Store
+
+# React UI (src/Infrastructure/UI)
+src/Infrastructure/UI/node_modules/
+src/Infrastructure/UI/dist/
+src/Infrastructure/UI/package-lock.json
+src/Infrastructure/UI/.vite/
