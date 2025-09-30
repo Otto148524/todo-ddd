@@ -101,30 +101,9 @@ mkTodoDomainFacade = TodoDomainFacade
         , eventDescription = Just taskDescription'
         , eventTimestamp = initiationTimestamp req
         }
-  , completeTaskFromRequest = \req -> do
-      taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
-      return $ DomainEvent
-        { eventType = TaskCompleted
-        , eventTaskId = taskId'
-        , eventDescription = Nothing
-        , eventTimestamp = updateTimestamp req
-        }
-  , reopenTaskFromRequest = \req -> do
-      taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
-      return $ DomainEvent
-        { eventType = TaskReopened
-        , eventTaskId = taskId'
-        , eventDescription = Nothing
-        , eventTimestamp = updateTimestamp req
-        }
-  , deleteTaskFromRequest = \req -> do
-      taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
-      return $ DomainEvent
-        { eventType = TaskDeleted
-        , eventTaskId = taskId'
-        , eventDescription = Nothing
-        , eventTimestamp = updateTimestamp req
-        }
+  , completeTaskFromRequest = mkTaskUpdateEvent TaskCompleted
+  , reopenTaskFromRequest = mkTaskUpdateEvent TaskReopened
+  , deleteTaskFromRequest = mkTaskUpdateEvent TaskDeleted
   -- DomainService
   , projectEventsToSnapshots = projectToSnapshots
   , findTaskById = findTaskInProjection
@@ -196,3 +175,14 @@ mkTodoDomainFacade = TodoDomainFacade
       , statisticsTupleToDto = id -- (Int, Int, Int) -> (Int, Int, Int)
       }
   }
+
+-- fromRequest抽象化
+mkTaskUpdateEvent :: EventType -> TaskUpdateRequest -> Either DomainError DomainEvent
+mkTaskUpdateEvent eventType' req = do
+  taskId' <- validateTaskId mkTodoDomainFacade (updateTaskId req)
+  return $ DomainEvent
+    { eventType = eventType'
+    , eventTaskId = taskId'
+    , eventDescription = Nothing
+    , eventTimestamp = updateTimestamp req
+    }
