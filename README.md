@@ -63,26 +63,26 @@ The following Mermaid diagram shows the dependency relationships between modules
 ```mermaid
 graph TB
     subgraph Infrastructure["Infrastructure Layer"]
-        WebServer[Web.Server<br/>Servant API]
-        WebTypes[Web.Types<br/>HTTP/API types]
-        EventStore[EventStore.InMemory<br/>STM-based storage]
-        Main[Main<br/>Entry point]
+        WebServer[Web.Server]
+        WebTypes[Web.Types]
+        EventStore[EventStore.InMemory]
+        Main[Main]
     end
 
     subgraph Application["Application Layer"]
-        TodoService[TodoService<br/>Use case orchestration]
-        DomainOps[DTO.Facade<br/>DomainOperations]
-        TaskDTO[DTO.TaskDTO<br/>Data transfer objects]
-        EventStorePort[Ports.EventStorePort<br/>Storage interface]
-        NotificationPort[Ports.NotificationPort<br/>Notification interface]
+        TodoService[TodoService]
+        DomainOps[DTO.Facade]
+        TaskDTO[DTO.TaskDTO]
+        EventStorePort[Ports.EventStorePort]
+        NotificationPort[Ports.NotificationPort]
     end
 
     subgraph Domain["Domain Layer"]
-        Aggregate[Todo.Aggregate<br/>TodoDomainFacade]
-        DomainService[Todo.DomainService<br/>Event projection]
-        Events[Todo.Events<br/>EventType ADT]
-        Entity[Todo.Entity<br/>Task entity]
-        ValueObject[Todo.ValueObject<br/>TaskId, TaskDescription]
+        Aggregate[Todo.Aggregate]
+        DomainService[Todo.DomainService]
+        Events[Todo.Events]
+        Entity[Todo.Entity]
+        ValueObject[Todo.ValueObject]
     end
 
     %% Domain internal dependencies
@@ -208,31 +208,48 @@ The architecture employs dual facades for layer separation:
 ## File Structure
 
 ```
-src/
-├── Domain/
-│   └── Todo/
-│       ├── ValueObject.hs          # TaskId, TaskDescription with smart constructors
-│       ├── Entity.hs               # Task entity (taskId, taskDescription, isCompleted)
-│       ├── Events.hs               # EventType ADT and DomainEvent record
-│       ├── DomainService.hs        # Event projection and query functions
-│       └── Aggregate.hs            # TodoDomainFacade with DTOConversionSupport
-├── Application/
-│   ├── DTO/
-│   │   ├── TaskDTO.hs              # TaskDTO, TodoEventDTO, TasksStatisticsDTO
-│   │   └── Facade.hs               # DomainOperations facade
-│   ├── Ports/
-│   │   ├── EventStorePort.hs      # EventStore interface
-│   │   └── NotificationPort.hs    # NotificationPort interface
-│   └── TodoService.hs              # TodoService implementation
-└── Infrastructure/
-    ├── EventStore/
-    │   └── InMemory.hs             # STM-based event store (AppM/AppIO)
-    └── Web/
-        ├── Types.hs                # HTTP types and TodoAPI definition
-        └── Server.hs               # Servant server with CORS
-
-app/Main.hs                         # Application entry point
-test/Spec.hs                        # Test specifications
+todo-ddd/
+├── app/
+│   └── Main.hs                                 # Application entry point with initialization
+├── src/
+│   ├── Domain/
+│   │   └── Todo/
+│   │       ├── ValueObject.hs                  # TaskId, TaskDescription with smart constructors
+│   │       ├── Entity.hs                       # Task entity (taskId, taskDescription, isCompleted)
+│   │       ├── Events.hs                       # EventType ADT and DomainEvent record
+│   │       ├── DomainService.hs                # Event projection and query functions
+│   │       └── Aggregate.hs                    # TodoDomainFacade with DTOConversionSupport
+│   ├── Application/
+│   │   ├── DTO/
+│   │   │   ├── TaskDTO.hs                      # TaskDTO, TodoEventDTO, TasksStatisticsDTO
+│   │   │   └── Facade.hs                       # DomainOperations facade
+│   │   ├── Ports/
+│   │   │   ├── EventStorePort.hs               # EventStore interface
+│   │   │   └── NotificationPort.hs             # NotificationPort interface
+│   │   └── TodoService.hs                      # TodoService implementation
+│   └── Infrastructure/
+│       ├── EventStore/
+│       │   └── InMemory.hs                     # STM-based event store (AppM/AppIO)
+│       ├── Web/
+│       │   ├── Types.hs                        # HTTP types and TodoAPI definition
+│       │   └── Server.hs                       # Servant server with CORS
+│       └── UI/                                 # React frontend (Vite + TypeScript + TailwindCSS)
+│           ├── src/
+│           │   ├── App.tsx                     # Main React component
+│           │   ├── api.ts                      # API client with type-safe DTOs
+│           │   └── main.tsx                    # React entry point
+│           ├── public/                         # Static assets
+│           ├── index.html                      # HTML entry point
+│           ├── package.json                    # Node dependencies
+│           ├── vite.config.ts                  # Vite configuration
+│           ├── tsconfig.json                   # TypeScript configuration
+│           └── tailwind.config.js              # TailwindCSS configuration
+├── test/
+│   └── Spec.hs                                 # Test specifications
+├── package.yaml                                # Hpack project configuration
+├── todo-ddd.cabal                              # Generated Cabal file
+├── stack.yaml                                  # Stack configuration
+└── README.md                                   # Project documentation
 ```
 
 ## Build and Execution
