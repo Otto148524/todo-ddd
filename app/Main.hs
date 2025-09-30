@@ -12,9 +12,9 @@ import Network.Wai.Handler.Warp
 initializeSampleData :: AppConfig -> IO ()
 initializeSampleData config = runAppIO config $ do
   let service = mkTodoService domainOps :: TodoService AppIO
-  _ <- createTodoImpl service "ヘキサゴナルアーキテクチャを学ぶ"
-  _ <- createTodoImpl service "イベントソーシングを理解する"
-  _ <- createTodoImpl service "ドメイン駆動設計を実践する"
+  _ <- initiateTaskImpl service "ヘキサゴナルアーキテクチャを学ぶ"
+  _ <- initiateTaskImpl service "イベントソーシングを理解する"
+  _ <- initiateTaskImpl service "ドメイン駆動設計を実践する"
   return ()
 
 main :: IO ()
@@ -29,16 +29,16 @@ main = do
   putStrLn "========================================="
   putStrLn "Server starting on http://localhost:8080"
   putStrLn ""
-  putStrLn "Initial todos created:"
+  putStrLn "Initial tasks created:"
   putStrLn "  ✓ ヘキサゴナルアーキテクチャを学ぶ"
   putStrLn "  ✓ イベントソーシングを理解する"
   putStrLn "  ✓ ドメイン駆動設計を実践する"
   putStrLn ""
   putStrLn "API Endpoints:"
-  putStrLn "  GET  /api/todos        - Get all todos and statistics"
-  putStrLn "  POST /api/todos        - Create new todo"
-  putStrLn "  POST /api/todos/toggle - Toggle todo completion"
-  putStrLn "  POST /api/todos/delete - Delete todo"
+  putStrLn "  GET  /api/tasks        - Get all tasks and statistics"
+  putStrLn "  POST /api/tasks        - Create/Initiate new task"
+  putStrLn "  POST /api/tasks/toggle - Toggle a task completion"
+  putStrLn "  POST /api/tasks/delete - Delete task"
   putStrLn "  GET  /api/events       - Get event history"
   putStrLn "========================================="
 

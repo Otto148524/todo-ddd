@@ -211,9 +211,9 @@ mkTodoDomainFacade = TodoDomainFacade
             }
       , taskSnapshotToTodoDto = \snapshot ->
         (snapshotTaskId snapshot, snapshotTaskDescription snapshot, snapshotTaskCompleted snapshot)
-      , todoEventDtoToTaskEventRecord = \(eventType', todoId', desc, timestamp') -> TaskEventRecord
+      , todoEventDtoToTaskEventRecord = \(eventType', taskId', desc, timestamp') -> TaskEventRecord
           { recordType = eventType'
-          , recordTaskId = todoId'
+          , recordTaskId = taskId'
           , recordTaskDescription = desc
           , recordTimestamp= timestamp'
           }

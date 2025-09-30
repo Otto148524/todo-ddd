@@ -4,7 +4,7 @@
 module Application.DTO.TaskDTO
   ( TaskDTO(..)
   , TodoEventDTO(..)
-  , TodoStatisticsDTO(..)
+  , TasksStatisticsDTO(..)
   ) where
 
 import Data.Aeson
@@ -21,57 +21,57 @@ data TaskDTO = TaskDTO
 
 instance ToJSON TaskDTO where
   toJSON dto = object
-    [ "todoId" .= taskDtoId dto
-    , "text" .= taskDtoDesc dto
-    , "completed" .= taskDtoIsCompleted dto
+    [ "taskId" .= taskDtoId dto
+    , "desc" .= taskDtoDesc dto
+    , "isCompleted" .= taskDtoIsCompleted dto
     ]
 
 instance FromJSON TaskDTO where
   parseJSON = withObject "TaskDTO" $ \v -> TaskDTO
-    <$> v .: "todoId"
-    <*> v .: "text"
-    <*> v .: "completed"
+    <$> v .: "taskId"
+    <*> v .: "desc"
+    <*> v .: "isCompleted"
 
 -- Event DTOs
 data TodoEventDTO
-  = TodoCreatedDTO String String UTCTime
-  | TodoCompletedDTO String UTCTime
-  | TodoUncompletedDTO String UTCTime
-  | TodoDeletedDTO String UTCTime
+  = TaskInitiatedDTO String String UTCTime
+  | TaskCompletedDTO String UTCTime
+  | TaskReopenedDTO String UTCTime
+  | TaskDeletedDTO String UTCTime
   deriving (Show, Eq, Generic)
 
 instance ToJSON TodoEventDTO where
-  toJSON (TodoCreatedDTO id' txt ts) =
+  toJSON (TaskInitiatedDTO id' desc ts) =
     object
-      [ "type" .= ("TodoCreated" :: Text)
+      [ "type" .= ("TaskInitiated" :: Text)
       , "id" .= id'
-      , "text" .= txt
+      , "desc" .= desc
       , "timestamp" .= ts
       ]
-  toJSON (TodoCompletedDTO id' ts) =
+  toJSON (TaskCompletedDTO id' ts) =
     object
-      [ "type" .= ("TodoCompleted" :: Text)
-      , "id" .= id'
-      , "timestamp" .= ts
-      ]
-  toJSON (TodoUncompletedDTO id' ts) =
-    object
-      [ "type" .= ("TodoUncompleted" :: Text)
+      [ "type" .= ("TaskCompleted" :: Text)
       , "id" .= id'
       , "timestamp" .= ts
       ]
-  toJSON (TodoDeletedDTO id' ts) =
+  toJSON (TaskReopenedDTO id' ts) =
     object
-      [ "type" .= ("TodoDeleted" :: Text)
+      [ "type" .= ("TaskReopened" :: Text)
+      , "id" .= id'
+      , "timestamp" .= ts
+      ]
+  toJSON (TaskDeletedDTO id' ts) =
+    object
+      [ "type" .= ("TaskDeleted" :: Text)
       , "id" .= id'
       , "timestamp" .= ts
       ]
 
 -- StatisticsDTO
-data TodoStatisticsDTO = TodoStatisticsDTO
+data TasksStatisticsDTO = TasksStatisticsDTO
   { totalCount :: Int
   , activeCount :: Int
-  , completedCount :: Int
+  , isCompletedCount :: Int
   } deriving (Show, Eq, Generic)
 
-instance ToJSON TodoStatisticsDTO
+instance ToJSON TasksStatisticsDTO

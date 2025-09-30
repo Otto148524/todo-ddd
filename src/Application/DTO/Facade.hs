@@ -19,15 +19,15 @@ import qualified Data.Maybe
 -- ドメイン層の関数のファサード
 data DomainOperations = DomainOperations
   { -- Todo作成・更新（DTOベース）
-    createTodoDTO :: String -> String -> UTCTime -> Either Text TodoEventDTO
-  , completeTodoDTO :: String -> UTCTime -> Either Text TodoEventDTO
-  , uncompleteTodoDTO :: String -> UTCTime -> Either Text TodoEventDTO
-  , deleteTodoDTO :: String -> UTCTime -> Either Text TodoEventDTO
+    initiateTaskDTO :: String -> String -> UTCTime -> Either Text TodoEventDTO
+  , completeTaskDTO :: String -> UTCTime -> Either Text TodoEventDTO
+  , reopenTaskDTO :: String -> UTCTime -> Either Text TodoEventDTO
+  , deleteTaskDTO :: String -> UTCTime -> Either Text TodoEventDTO
 
     -- クエリ（DTOベース）
-  , getAllTodosDTO :: [TodoEventDTO] -> [TaskDTO]
-  , findTodoDTOById :: String -> [TodoEventDTO] -> Maybe TaskDTO
-  , getStatisticsDTO :: [TodoEventDTO] -> TodoStatisticsDTO
+  , getAllTaskDTOs :: [TodoEventDTO] -> [TaskDTO]
+  , findTaskDTOById :: String -> [TodoEventDTO] -> Maybe TaskDTO
+  , getStatisticsDTO :: [TodoEventDTO] -> TasksStatisticsDTO
 
     -- Event変換（DTOベース）
   , eventDTOsFromDomainEvents :: [TodoEventDTO] -> [TodoEventDTO] -- id
@@ -36,8 +36,8 @@ data DomainOperations = DomainOperations
 -- ファサードの実装
 domainOps :: DomainOperations
 domainOps = DomainOperations
-  { createTodoDTO = \todoId' text' timestamp' ->
-    let req = TaskInitiationRequest todoId' text' timestamp'
+  { initiateTaskDTO = \taskId' desc' timestamp' ->
+    let req = TaskInitiationRequest taskId' desc' timestamp'
         facade = mkTodoDomainFacade
     in case initiateTaskFromRequest facade req of
       Left (InvalidTaskId err) -> Left err
@@ -46,13 +46,12 @@ domainOps = DomainOperations
       Left (TaskNotFound err) -> Left err
       Right domainEvent ->
         let domainView = eventToRecord facade domainEvent
-            (eventType', eid, mText, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
+            (eventType', eid, mDesc, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
         in case eventType' of
-          "TodoCreated" -> Right $ TodoCreatedDTO eid (Data.Maybe.fromMaybe "" mText) ts --v2移行完了後消す
-          "TaskInitiated" -> Right $ TodoCreatedDTO eid (Data.Maybe.fromMaybe "" mText) ts
+          "TaskInitiated" -> Right $ TaskInitiatedDTO eid (Data.Maybe.fromMaybe "" mDesc) ts
           _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
-  , completeTodoDTO = \todoId' timestamp' ->
-      let req = TaskUpdateRequest todoId' timestamp'
+  , completeTaskDTO = \taskId' timestamp' ->
+      let req = TaskUpdateRequest taskId' timestamp'
           facade = mkTodoDomainFacade
       in case completeTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
@@ -63,11 +62,10 @@ domainOps = DomainOperations
           let domainView = eventToRecord facade domainEvent
               (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
           in case eventType' of
-            "TodoCompleted" -> Right $ TodoCompletedDTO eid ts
-            "TaskCompleted" -> Right $ TodoCompletedDTO eid ts
+            "TaskCompleted" -> Right $ TaskCompletedDTO eid ts
             _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
-  , uncompleteTodoDTO = \todoId' timestamp' ->
-      let req = TaskUpdateRequest todoId' timestamp'
+  , reopenTaskDTO = \taskId' timestamp' ->
+      let req = TaskUpdateRequest taskId' timestamp'
           facade = mkTodoDomainFacade
       in case reopenTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
@@ -75,14 +73,13 @@ domainOps = DomainOperations
         Left (DomainLogicError err) -> Left err
         Left (TaskNotFound err) -> Left err
         Right domainEvent ->
-          let domainView = eventToRecord facade domainEvent
-              (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
+          let domainRecord = eventToRecord facade domainEvent
+              (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainRecord
           in case eventType' of
-            "TodoUncompleted" -> Right $ TodoUncompletedDTO eid ts
-            "TaskReopened" -> Right $ TodoUncompletedDTO eid ts
+            "TaskReopened" -> Right $ TaskReopenedDTO eid ts
             _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
-  , deleteTodoDTO = \todoId' timestamp' ->
-      let req = TaskUpdateRequest todoId' timestamp'
+  , deleteTaskDTO = \taskId' timestamp' ->
+      let req = TaskUpdateRequest taskId' timestamp'
           facade = mkTodoDomainFacade
       in case deleteTaskFromRequest facade req of
         Left (InvalidTaskId err) -> Left err
@@ -90,37 +87,36 @@ domainOps = DomainOperations
         Left (DomainLogicError err) -> Left err
         Left (TaskNotFound err) -> Left err
         Right domainEvent ->
-          let domainView = eventToRecord facade domainEvent
-              (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainView
+          let domainRecord = eventToRecord facade domainEvent
+              (eventType', eid, _, ts) = taskEventRecordToTodoEventDto (dtoConversion facade) domainRecord
           in case eventType' of
-            "TodoDeleted" -> Right $ TodoDeletedDTO eid ts
-            "TaskDeleted" -> Right $ TodoDeletedDTO eid ts
+            "TaskDeleted" -> Right $ TaskDeletedDTO eid ts
             _ -> Left $ T.pack $ "Unexpected event type: " ++ eventType'
-  , getAllTodosDTO = \eventDtos ->
+  , getAllTaskDTOs = \eventDtos ->
       let facade = mkTodoDomainFacade
-          -- DTOからDomainViewに変換
-          domainViews = map (\case
-              TodoCreatedDTO eid txt ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TodoCreated", eid, Just txt, ts)
-              TodoCompletedDTO eid ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TodoCompleted", eid, Nothing, ts)
-              TodoUncompletedDTO eid ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TodoUncompleted", eid, Nothing, ts)
-              TodoDeletedDTO eid ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TodoDeleted", eid, Nothing, ts)
+          -- DTOからTaskEventRecordに変換
+          domainRecords = map (\case
+              TaskInitiatedDTO eid txt ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TaskInitiated", eid, Just txt, ts)
+              TaskCompletedDTO eid ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TaskCompleted", eid, Nothing, ts)
+              TaskReopenedDTO eid ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TaskReopened", eid, Nothing, ts)
+              TaskDeletedDTO eid ts -> todoEventDtoToTaskEventRecord (dtoConversion facade) ("TaskDeleted", eid, Nothing, ts)
               ) eventDtos
-          -- DomainViewからTodoViewに投影
-          todoViews = takeSnapshotsFromEventRecords facade domainViews
-          -- TodoViewからDTOに変換
-      in map (\view ->
-          let (eid, txt, completed') = taskSnapshotToTodoDto (dtoConversion facade) view
-          in TaskDTO eid txt completed') todoViews
-  , findTodoDTOById = \targetId eventDtos ->
-      case getAllTodosDTO domainOps eventDtos of
-        todos' -> case filter (\dto -> taskDtoId dto == targetId) todos' of
-          (todo:_) -> Just todo
+          -- TaskEventRecordからTaskSnapshotに投影
+          taskSnapshots = takeSnapshotsFromEventRecords facade domainRecords
+          -- TaskSnapshotからDTOに変換
+      in map (\snapshot ->
+          let (eid, desc, isCompleted') = taskSnapshotToTodoDto (dtoConversion facade) snapshot
+          in TaskDTO eid desc isCompleted') taskSnapshots
+  , findTaskDTOById = \targetId eventDtos ->
+      case getAllTaskDTOs domainOps eventDtos of
+        tasks' -> case filter (\dto -> taskDtoId dto == targetId) tasks' of
+          (task:_) -> Just task
           [] -> Nothing
   , getStatisticsDTO = \eventDtos ->
-      let todos' = getAllTodosDTO domainOps eventDtos
-          total = length todos'
-          completed' = length $ filter taskDtoIsCompleted todos'
+      let tasks' = getAllTaskDTOs domainOps eventDtos
+          total = length tasks'
+          completed' = length $ filter taskDtoIsCompleted tasks'
           active = total - completed'
-      in TodoStatisticsDTO total active completed'
+      in TasksStatisticsDTO total active completed'
   , eventDTOsFromDomainEvents = id
   }

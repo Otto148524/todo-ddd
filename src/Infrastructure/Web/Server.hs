@@ -21,32 +21,32 @@ import Servant
 todoServer :: AppConfig -> Server TodoAPI
 todoServer config =
   getTodos
-    :<|> createTodoHandler
-    :<|> toggleTodoHandler
-    :<|> deleteTodoHandler
+    :<|> initiateTaskHandler
+    :<|> toggleTaskHandler
+    :<|> deleteTaskHandler
     :<|> getEvents
   where
     service = mkTodoService domainOps :: TodoService AppM
 
-    getTodos :: Handler TodosResponse
+    getTodos :: Handler TasksResponse
     getTodos = runAppM config $ do
-      ts <- getAllTodosImpl service
+      ts <- getAllTasksImpl service
       stats <- getStatisticsImpl service
-      return $ TodosResponse ts stats
+      return $ TasksResponse ts stats
 
-    createTodoHandler :: CreateTodoRequest -> Handler CreateTodoResponse
-    createTodoHandler req = runAppM config $ do
-      todoId' <- createTodoImpl service (requestText req)
-      return $ CreateTodoResponse todoId'
+    initiateTaskHandler :: InitiateTaskRequest -> Handler InitiateTaskResponse
+    initiateTaskHandler req = runAppM config $ do
+      taskId' <- initiateTaskImpl service (requestText req)
+      return $ InitiateTaskResponse taskId'
 
-    toggleTodoHandler :: ToggleRequest -> Handler NoContent
-    toggleTodoHandler req = runAppM config $ do
-      _ <- toggleTodoImpl service (toggleId req)
+    toggleTaskHandler :: ToggleRequest -> Handler NoContent
+    toggleTaskHandler req = runAppM config $ do
+      _ <- toggleTaskImpl service (toggleId req)
       return NoContent
 
-    deleteTodoHandler :: DeleteRequest -> Handler NoContent
-    deleteTodoHandler req = runAppM config $ do
-      _ <- deleteTodoImpl service (deleteId req)
+    deleteTaskHandler :: DeleteRequest -> Handler NoContent
+    deleteTaskHandler req = runAppM config $ do
+      _ <- deleteTaskImpl service (deleteId req)
       return NoContent
 
     getEvents :: Handler [TodoEventDTO]

@@ -2,9 +2,56 @@
 
 Haskell implementation of a Todo application using Domain-Driven Design (DDD) principles, Event Sourcing, and Hexagonal Architecture.
 
+## Current Status (2025-09-30)
+
+- Type-safe ADT-based event system implemented
+- Event Sourcing with STM-based in-memory event store
+- Hexagonal Architecture with three-layer separation
+- REST API operational on port 8080
+- Dual Facade Pattern between Domain/Application layers
+- Backward-compatible event type conversion
+
 ## Architecture Overview
 
 The project follows a three-layer architecture with dependency inversion and type-safe event handling. Domain logic is isolated from infrastructure concerns through the Facade pattern. The domain layer has been successfully migrated from string-based events to a type-safe ADT-based event system.
+
+## Ubiquitous Language
+
+This project uses a two-level terminology strategy to distinguish between domain scope and entity level:
+
+### Terminology Design
+
+| Term | Abstraction Level | Usage | Meaning |
+|------|------------------|-------|---------|
+| **Todo** | Domain/Context | `TodoService`, `TodoAPI`, `TodoEventDTO`, `Domain/Todo/` | Refers to the overall **Todo application domain** as a bounded context |
+| **Task** | Entity | `Task`, `TaskDTO`, `TaskId`, `TaskDescription`, `/api/tasks` | Refers to a concrete **task item** (a specific "thing to do") within the domain |
+
+### Key Principles
+
+1. **Todo = Bounded Context**: The term "Todo" represents the application domain as a whole
+   - `TodoService`: Service managing the Todo domain
+   - `TodoAPI`: Complete API for the Todo application
+   - `TodoEventDTO`: Events occurring within the Todo domain context
+   - `Domain/Todo/`: Directory representing the Todo bounded context
+
+2. **Task = Domain Entity**: The term "Task" represents individual work items
+   - `Task`: Core domain entity representing a single task
+   - `TaskDTO`: Data transfer object for task serialization
+   - `TaskId`, `TaskDescription`: Value objects identifying and describing tasks
+   - `/api/tasks`: REST endpoint for task resources (plural form)
+
+3. **Event Naming Convention**:
+   - `TodoEventDTO`: "Events in the Todo domain" (domain-level abstraction)
+   - Event types use entity-level terminology: `TaskInitiated`, `TaskCompleted`, `TaskReopened`, `TaskDeleted`
+   - This allows future extension to other event types (e.g., `UserEvent`) while maintaining the Todo domain context
+
+### Consistency Across Layers
+
+- **Domain Layer**: 100% uses `Task` terminology for entities and value objects
+- **Application Layer**: Uses `Task` for operations, `Todo` for services and domain-wide concepts
+- **Infrastructure Layer**: Uses `Task` in API paths (`/api/tasks`), `Todo` for API type definitions (`TodoAPI`)
+
+This terminology strategy aligns with DDD's **Context Mapping** principles, where `Todo` represents the bounded context and `Task` represents the core entity within that context.
 
 ## Module Dependencies
 
@@ -174,15 +221,53 @@ The architecture employs dual facades for layer separation:
 ## Build and Execution
 
 ```bash
-cabal build           # Build the project
-cabal run todo-ddd-exe  # Run the server
-# API endpoint: http://localhost:8080/api/todos
+# Generate .cabal file from package.yaml (if modified)
+hpack
+
+# Build the project
+cabal build
+
+# Run the server (starts on http://localhost:8080)
+cabal run todo-ddd-exe
+
+# Run REPL for experimentation
+cabal repl
 ```
 
-### API Endpoints
+## API Endpoints
 
-- `GET /api/todos`: List todos with statistics
-- `POST /api/todos`: Create todo
-- `POST /api/todos/toggle`: Toggle completion status
-- `POST /api/todos/delete`: Delete todo
-- `GET /api/events`: Event history
+The REST API provides the following endpoints:
+
+- `GET /api/tasks`: List all tasks with statistics
+- `POST /api/tasks`: Create/Initiate new task
+  - Request body: `{"requestText": "task description"}`
+  - Response: `{"createId": "task-id"}`
+- `POST /api/tasks/toggle`: Toggle task completion status
+  - Request body: `{"toggleId": "task-id"}`
+- `POST /api/tasks/delete`: Delete task
+  - Request body: `{"deleteId": "task-id"}`
+- `GET /api/events`: View complete event history
+
+### Testing the API
+
+```bash
+# Start the server
+cabal run todo-ddd-exe
+# Server runs on http://localhost:8080
+
+# Create a task
+curl -X POST http://localhost:8080/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"requestText": "Learn DDD with Haskell"}'
+
+# Get all tasks
+curl http://localhost:8080/api/tasks
+
+# Toggle task completion
+curl -X POST http://localhost:8080/api/tasks/toggle \
+  -H "Content-Type: application/json" \
+  -d '{"toggleId": "your-task-id"}'
+
+# View event history
+curl http://localhost:8080/api/events
+```
