@@ -22,7 +22,7 @@ graph TB
     subgraph "Application Layer (Use Cases & DTOs)"
         AppService[Application.TodoService]
         AppFacade[Application.DTO.Facade]
-        AppDTO[Application.DTO.TodoDTO]
+        AppDTO[Application.DTO.TaskDTO]
         AppEventPort[Application.Ports.EventStorePort]
         AppNotificationPort[Application.Ports.NotificationPort]
     end
@@ -91,7 +91,7 @@ The architecture implements Dependency Inversion Principle with Facade Pattern:
    - `Domain.Todo.Aggregate`: Aggregate root providing domain boundary and `DTOConversionSupport`
 
 2. **Application Layer**: Orchestrates use cases through aggregates
-   - `Application.DTO.TodoDTO`: Data Transfer Objects without domain imports
+   - `Application.DTO.TaskDTO`: Data Transfer Objects without domain imports
    - `Application.DTO.Facade`: Bridge module importing only `Aggregate`
    - `Application.TodoService`: Service implementation using `DomainOperations`
    - `Application.Ports.*`: Infrastructure interface definitions
@@ -157,7 +157,7 @@ The architecture employs dual facades for layer separation:
 - `src/Domain/Todo/Aggregate.hs` - Aggregate root with DomainEvent-based implementation
 
 ### Application Layer
-- `src/Application/DTO/TodoDTO.hs` - Data Transfer Objects with JSON serialization
+- `src/Application/DTO/TaskDTO.hs` - Data Transfer Objects with JSON serialization
 - `src/Application/DTO/Facade.hs` - Bridge adapter (`DomainOperations`) between layers
 - `src/Application/TodoService.hs` - Use case implementations and service composition
 - `src/Application/Ports/EventStorePort.hs` - Event storage interface

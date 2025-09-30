@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-
 module Domain.Todo.Events
   (
     EventType(..) -- TodoEventからこちらに移行予定（その時に型の名前をTaskInitiatedなどに変える）
@@ -11,14 +9,6 @@ module Domain.Todo.Events
 import Domain.Todo.ValueObject
 
 import Data.Time
-import GHC.Generics
-
-data TodoEvent -- later deprecated
-  = TaskInitiated' TaskId TaskDescription UTCTime -- 動詞的な名称で型と一貫していない
-  | TaskCompleted' TaskId UTCTime
-  | TaskReopened' TaskId UTCTime
-  | TaskDeleted' TaskId UTCTime
-  deriving (Show, Eq, Generic)
 
 -- === ADT for Event Types ===
 data EventType

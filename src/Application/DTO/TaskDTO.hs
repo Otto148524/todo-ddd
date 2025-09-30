@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Application.DTO.TodoDTO
-  ( TodoDTO(..)
+module Application.DTO.TaskDTO
+  ( TaskDTO(..)
   , TodoEventDTO(..)
   , TodoStatisticsDTO(..)
   ) where
@@ -13,21 +13,21 @@ import Data.Time
 import GHC.Generics
 
 -- DTOs for external communication
-data TodoDTO = TodoDTO
-  { todoDtoId :: String
-  , todoDtoText :: String
-  , todoDtoCompleted :: Bool
+data TaskDTO = TaskDTO
+  { taskDtoId :: String
+  , taskDtoDesc :: String
+  , taskDtoIsCompleted :: Bool
   } deriving (Show, Eq, Generic)
 
-instance ToJSON TodoDTO where
+instance ToJSON TaskDTO where
   toJSON dto = object
-    [ "todoId" .= todoDtoId dto
-    , "text" .= todoDtoText dto
-    , "completed" .= todoDtoCompleted dto
+    [ "todoId" .= taskDtoId dto
+    , "text" .= taskDtoDesc dto
+    , "completed" .= taskDtoIsCompleted dto
     ]
 
-instance FromJSON TodoDTO where
-  parseJSON = withObject "TodoDTO" $ \v -> TodoDTO
+instance FromJSON TaskDTO where
+  parseJSON = withObject "TaskDTO" $ \v -> TaskDTO
     <$> v .: "todoId"
     <*> v .: "text"
     <*> v .: "completed"
@@ -56,7 +56,7 @@ instance ToJSON TodoEventDTO where
       ]
   toJSON (TodoUncompletedDTO id' ts) =
     object
-      [ "type" .= ("TodoUnCompleted" :: Text)
+      [ "type" .= ("TodoUncompleted" :: Text)
       , "id" .= id'
       , "timestamp" .= ts
       ]

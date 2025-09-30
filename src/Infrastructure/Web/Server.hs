@@ -8,7 +8,7 @@ module Infrastructure.Web.Server
   ) where
 
 import Application.DTO.Facade (domainOps)
-import Application.DTO.TodoDTO
+import Application.DTO.TaskDTO
 import Application.TodoService
 
 import Infrastructure.Web.Types

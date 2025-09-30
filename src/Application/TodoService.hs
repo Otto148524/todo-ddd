@@ -6,7 +6,7 @@ module Application.TodoService
   ) where
 
 import Application.DTO.Facade
-import Application.DTO.TodoDTO
+import Application.DTO.TaskDTO
 import Application.Ports.EventStorePort
 import Application.Ports.NotificationPort
 
@@ -20,7 +20,7 @@ data TodoService m = TodoService
   { createTodoImpl :: String -> m String
   , toggleTodoImpl :: String -> m Bool
   , deleteTodoImpl :: String -> m Bool
-  , getAllTodosImpl :: m [TodoDTO]
+  , getAllTodosImpl :: m [TaskDTO]
   , getStatisticsImpl :: m TodoStatisticsDTO
   , getEventHistoryImpl :: m [TodoEventDTO]
   }
@@ -42,7 +42,7 @@ mkTodoService ops = TodoService
       case findTodoDTOById ops targetIdStr eventDtos of
         Just todo -> do
           now <- liftIO getCurrentTime
-          let eventResult = if todoDtoCompleted todo
+          let eventResult = if taskDtoIsCompleted todo
               then uncompleteTodoDTO ops targetIdStr now
               else completeTodoDTO ops targetIdStr now
           case eventResult of

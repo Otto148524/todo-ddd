@@ -11,7 +11,7 @@ module Infrastructure.Web.Types
   , TodoAPI
   ) where
 
-import Application.DTO.TodoDTO
+import Application.DTO.TaskDTO
 
 import Data.Aeson
 import GHC.Generics
@@ -30,7 +30,7 @@ newtype CreateTodoResponse = CreateTodoResponse
 instance ToJSON CreateTodoResponse
 
 data TodosResponse = TodosResponse
-  { todos :: [TodoDTO]
+  { todos :: [TaskDTO]
   , statistics :: TodoStatisticsDTO
   } deriving (Generic)
 

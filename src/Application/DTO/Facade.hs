@@ -9,7 +9,7 @@ module Application.DTO.Facade
 
 import Domain.Todo.Aggregate
 
-import Application.DTO.TodoDTO
+import Application.DTO.TaskDTO
 
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -25,8 +25,8 @@ data DomainOperations = DomainOperations
   , deleteTodoDTO :: String -> UTCTime -> Either Text TodoEventDTO
 
     -- クエリ（DTOベース）
-  , getAllTodosDTO :: [TodoEventDTO] -> [TodoDTO]
-  , findTodoDTOById :: String -> [TodoEventDTO] -> Maybe TodoDTO
+  , getAllTodosDTO :: [TodoEventDTO] -> [TaskDTO]
+  , findTodoDTOById :: String -> [TodoEventDTO] -> Maybe TaskDTO
   , getStatisticsDTO :: [TodoEventDTO] -> TodoStatisticsDTO
 
     -- Event変換（DTOベース）
@@ -110,16 +110,16 @@ domainOps = DomainOperations
           -- TodoViewからDTOに変換
       in map (\view ->
           let (eid, txt, completed') = taskSnapshotToTodoDto (dtoConversion facade) view
-          in TodoDTO eid txt completed') todoViews
+          in TaskDTO eid txt completed') todoViews
   , findTodoDTOById = \targetId eventDtos ->
       case getAllTodosDTO domainOps eventDtos of
-        todos' -> case filter (\dto -> todoDtoId dto == targetId) todos' of
+        todos' -> case filter (\dto -> taskDtoId dto == targetId) todos' of
           (todo:_) -> Just todo
           [] -> Nothing
   , getStatisticsDTO = \eventDtos ->
       let todos' = getAllTodosDTO domainOps eventDtos
           total = length todos'
-          completed' = length $ filter todoDtoCompleted todos'
+          completed' = length $ filter taskDtoIsCompleted todos'
           active = total - completed'
       in TodoStatisticsDTO total active completed'
   , eventDTOsFromDomainEvents = id
