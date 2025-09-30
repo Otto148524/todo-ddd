@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
-
 module Domain.Todo.Aggregate
   ( TodoDomainFacade(..)
   , mkTodoDomainFacade
@@ -13,18 +10,14 @@ module Domain.Todo.Aggregate
   , DTOConversionSupport(..)
   ) where
 
-import Domain.Todo.Entity
+
 import Domain.Todo.Events
 import Domain.Todo.ValueObject
+import Domain.Todo.DomainService
 
 import Data.Text (Text)
 import Data.Time (UTCTime)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 import Data.Maybe (mapMaybe)
-import Data.List (foldl')
-import qualified Data.Text as T
-
 
 
 -- Domain Error Types
@@ -35,13 +28,6 @@ data DomainError
   | TaskNotFound Text
   | DomainLogicError Text
   deriving (Show, Eq)
-
--- 外部向けのスナップショット型（DTOの代わり）
-data TaskSnapshot = TaskSnapshot
-  { snapshotTaskId :: String
-  , snapshotTaskDescription :: String
-  , snapshotTaskCompleted :: Bool
-  } deriving (Show, Eq)
 
 data TaskEventRecord= TaskEventRecord
   { recordType :: String
@@ -77,10 +63,8 @@ data DTOConversionSupport = DTOConversionSupport
 
 -- 統一インターフェース
 data TodoDomainFacade = TodoDomainFacade
-  { -- Task作成
+  { -- Command Handlers
     initiateTaskFromRequest :: TaskInitiationRequest -> Either DomainError DomainEvent
-
-    -- Task状態変更
   , completeTaskFromRequest :: TaskUpdateRequest -> Either DomainError DomainEvent
   , reopenTaskFromRequest :: TaskUpdateRequest -> Either DomainError DomainEvent
   , deleteTaskFromRequest :: TaskUpdateRequest -> Either DomainError DomainEvent
@@ -88,7 +72,7 @@ data TodoDomainFacade = TodoDomainFacade
     -- イベント投影とクエリ
   , projectEventsToSnapshots :: [DomainEvent] -> [TaskSnapshot]
   , findTaskById :: String -> [DomainEvent] -> Maybe TaskSnapshot
-  , getTaskStatistics :: [DomainEvent] -> (Int, Int, Int) -- (total number of tasks, completed tasks, active tasks)
+  , getTaskStatistics :: [DomainEvent] -> TaskStatistics
 
     -- イベント変換
   , eventToRecord :: DomainEvent -> TaskEventRecord
@@ -141,20 +125,10 @@ mkTodoDomainFacade = TodoDomainFacade
         , eventDescription = Nothing
         , eventTimestamp = updateTimestamp req
         }
-  , projectEventsToSnapshots = \events -> case projectEvents events of
-      Right tasks -> Map.elems $ Map.map taskToSnapshot tasks
-      Left err -> error $ "Failed to project events: " ++ show err -- 後でlogger実装をする
-  , findTaskById = \targetId events ->
-      let tasks = projectEventsToSnapshots mkTodoDomainFacade events
-      in case filter (\t -> snapshotTaskId t == targetId) tasks of
-        (task:_) -> Just task
-        [] -> Nothing
-  , getTaskStatistics = \events ->
-    let tasks = projectEventsToSnapshots mkTodoDomainFacade events
-        total = length tasks
-        completedCount' = length $ filter snapshotTaskCompleted tasks
-        active = total - completedCount'
-    in (total, completedCount', active)
+  -- DomainService
+  , projectEventsToSnapshots = projectToSnapshots
+  , findTaskById = findTaskInProjection
+  , getTaskStatistics = takeStatistics
   , eventToRecord = \domainEvent -> TaskEventRecord
       { recordType = eventTypeToString (eventType domainEvent)
       , recordTaskId = toIdString (eventTaskId domainEvent)
@@ -206,11 +180,11 @@ mkTodoDomainFacade = TodoDomainFacade
       { todoDtoToTaskSnapshot = \(id', desc', isCompleted') ->
           TaskSnapshot
             { snapshotTaskId = id'
-            , snapshotTaskDescription = desc'
-            , snapshotTaskCompleted = isCompleted'
+            , snapshotTaskDesc = desc'
+            , snapshotTaskIsCompleted = isCompleted'
             }
       , taskSnapshotToTodoDto = \snapshot ->
-        (snapshotTaskId snapshot, snapshotTaskDescription snapshot, snapshotTaskCompleted snapshot)
+        (snapshotTaskId snapshot, snapshotTaskDesc snapshot, snapshotTaskIsCompleted snapshot)
       , todoEventDtoToTaskEventRecord = \(eventType', taskId', desc, timestamp') -> TaskEventRecord
           { recordType = eventType'
           , recordTaskId = taskId'
@@ -222,33 +196,3 @@ mkTodoDomainFacade = TodoDomainFacade
       , statisticsTupleToDto = id -- (Int, Int, Int) -> (Int, Int, Int)
       }
   }
-
--- 内部ヘルパー関数
-
--- TaskエンティティをTaskSnapshotに変換する関数
-taskToSnapshot :: Task -> TaskSnapshot
-taskToSnapshot task = TaskSnapshot
-  { snapshotTaskId = toIdString (taskId task)
-  , snapshotTaskDescription = toDescString (taskDescription task)
-  , snapshotTaskCompleted = isCompleted task
-  }
-
--- DomainEventからの投影
-projectEvents :: [DomainEvent] -> Either DomainError (Map TaskId Task)
-projectEvents = foldl' applyEvent (Right Map.empty)
-  where
-    applyEvent :: Either DomainError (Map TaskId Task) -> DomainEvent -> Either DomainError (Map TaskId Task)
-    applyEvent (Left err) _ = Left err -- すでにエラーが出ている場合は伝播
-    applyEvent (Right tasks') event = case eventType event of
-      TaskInitiated -> case eventDescription event of
-        Just desc -> Right $ Map.insert (eventTaskId event) (Task (eventTaskId event) desc False) tasks'
-        Nothing -> Left $ DomainLogicError $ T.pack $ "TaskInitiated event missing description for task ID: " ++ toIdString (eventTaskId event)
-      TaskCompleted -> if Map.member (eventTaskId event) tasks'
-        then Right $ Map.adjust (\t -> t{isCompleted = True}) (eventTaskId event) tasks'
-        else Left $ TaskNotFound $ T.pack $ "Cannot complete non-existent task for task ID: " ++ toIdString (eventTaskId event)
-      TaskReopened -> if Map.member (eventTaskId event) tasks'
-        then Right $ Map.adjust (\t -> t{isCompleted = False}) (eventTaskId event) tasks'
-        else Left $ TaskNotFound $ T.pack $ "Cannot reopen non-existent task for task ID: " ++ toIdString (eventTaskId event)
-      TaskDeleted -> if Map.member (eventTaskId event) tasks'
-        then Right $ Map.delete (eventTaskId event) tasks'
-        else Left $ TaskNotFound $ T.pack $ "Cannot delete non-existent task for task ID: " ++ toIdString (eventTaskId event)
