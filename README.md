@@ -252,6 +252,81 @@ todo-ddd/
 └── README.md                                   # Project documentation
 ```
 
+## Development Environment Setup
+
+### Prerequisites
+
+- **GHC**: 9.6.7 (Glasgow Haskell Compiler)
+- **Cabal**: 3.12.1.0
+- **Stack**: 3.3.1 (LTS 21.25)
+- **HLS**: 2.10.0.0 (Haskell Language Server)
+- **Hpack**: For generating `.cabal` from `package.yaml`
+- **Node.js**: 18+ (for React frontend)
+
+### Option 1: Docker + Dev Container (Recommended)
+
+The easiest way to set up the environment using Docker and VS Code Dev Containers.
+
+**Requirements:**
+- Docker Desktop
+- Visual Studio Code
+- Dev Containers extension for VS Code
+
+**Steps:**
+
+1. Open this project folder in VS Code
+2. Press `F1` and select **"Dev Containers: Reopen in Container"**
+3. Wait for the container to build (first time takes ~10 minutes)
+4. The environment is ready with all tools pre-installed
+
+The [Dockerfile](Dockerfile) and [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json) are included in this repository.
+
+**What's included:**
+- GHC 9.6.7, Cabal 3.12.1.0, Stack 3.3.1, HLS 2.10.0.0
+- Development tools: hlint, hoogle, ormolu, fourmolu, ghcid, hpack
+- VS Code extensions: Haskell, HLS, ErrorLens, GitLens
+- Automatic dependency installation via `postCreateCommand`
+
+### Option 2: Local Installation with GHCup
+
+**Linux / macOS / WSL2:**
+
+```bash
+# Install GHCup
+curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+
+# Install required versions
+ghcup install ghc 9.6.7 --set
+ghcup install cabal 3.12.1.0 --set
+ghcup install hls 2.10.0.0 --set
+ghcup install stack 3.3.1 --set
+
+# Update cabal and install hpack
+cabal update
+cabal install --global hpack hlint --overwrite-policy=always
+```
+
+**System dependencies (Ubuntu/Debian):**
+```bash
+sudo apt-get install -y build-essential libgmp-dev zlib1g-dev \
+    libtinfo-dev libncurses-dev pkg-config
+```
+
+**macOS:**
+```bash
+brew install gmp ncurses
+```
+
+### VS Code Configuration
+
+The [.vscode/settings.json](.vscode/settings.json) file is included with recommended settings:
+
+- HLS integration with GHCup
+- Fourmolu as formatter
+- Format on save enabled
+- HLint diagnostics enabled
+- Optimized for Haskell development
+
 ## Build and Execution
 
 ```bash
