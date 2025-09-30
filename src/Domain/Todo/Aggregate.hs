@@ -126,7 +126,14 @@ mkTodoDomainFacade = TodoDomainFacade
         Right taskDescription' -> Right taskDescription'
 
   , takeSnapshotsFromEventRecords = \eventRecords ->
-      let convertRecordToDomainEvent record = do
+      let -- TaskUpdate系イベントの変換を抽象化
+          convertTaskUpdateEvent handler record =
+            let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
+            in case handler req of
+              Left _ -> Nothing
+              Right domainEvent -> Just domainEvent
+
+          convertRecordToDomainEvent record = do
             evType <- eventTypeFromString (recordType record)
             case evType of
               TaskInitiated -> case recordTaskDescription record of
@@ -136,21 +143,10 @@ mkTodoDomainFacade = TodoDomainFacade
                     Left _ -> Nothing
                     Right domainEvent -> Just domainEvent
                 Nothing -> Nothing
-              TaskCompleted ->
-                let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
-                in case completeTaskFromRequest mkTodoDomainFacade req of
-                  Left _ -> Nothing
-                  Right domainEvent -> Just domainEvent
-              TaskReopened ->
-                let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
-                in case reopenTaskFromRequest mkTodoDomainFacade req of
-                  Left _ -> Nothing
-                  Right domainEvent -> Just domainEvent
-              TaskDeleted ->
-                let req = TaskUpdateRequest (recordTaskId record) (recordTimestamp record)
-                in case deleteTaskFromRequest mkTodoDomainFacade req of
-                  Left _ -> Nothing
-                  Right domainEvent -> Just domainEvent
+              TaskCompleted -> convertTaskUpdateEvent (completeTaskFromRequest mkTodoDomainFacade) record
+              TaskReopened -> convertTaskUpdateEvent (reopenTaskFromRequest mkTodoDomainFacade) record
+              TaskDeleted -> convertTaskUpdateEvent (deleteTaskFromRequest mkTodoDomainFacade) record
+
           domainEvents = mapMaybe convertRecordToDomainEvent eventRecords
           in projectEventsToSnapshots mkTodoDomainFacade domainEvents
 
