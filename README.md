@@ -2,6 +2,89 @@
 
 Haskell implementation of a Todo application using Domain-Driven Design (DDD) principles, Event Sourcing, and Hexagonal Architecture.
 
+## How This Project Was Built
+
+This project was developed through conversations with **Claude** (claude.ai). The development journey started from a simple JavaScript prototype and evolved into a full-fledged Haskell DDD implementation.
+
+### Development Journey
+
+**Phase 1: Initial Concept (JavaScript Prototype)**
+- **User**: "イベント履歴式ドメインモデルとヘキサゴナルアーキテクチャを使った可能な限りシンプルなTodoアプリを作ってください" (Create a simple Todo app using Event Sourcing and Hexagonal Architecture)
+- Claude created an interactive JavaScript prototype with:
+  - Event Sourcing (TodoCreated, TodoCompleted, TodoUncompleted, TodoDeleted)
+  - Hexagonal Architecture (Domain, Ports, Adapters)
+  - In-memory event store
+  - Real-time event history visualization
+
+**Phase 2: Migration to Haskell**
+- **User**: "UI部分以外をhaskellに書き換えることはできるでしょうか？" (Can you rewrite everything except UI in Haskell?)
+- **User**: "実際に層ごとにhaskellコードに変換してみてください" (Actually convert it to Haskell code layer by layer)
+- Claude implemented:
+  - Domain layer with ADT-based events (`TodoEvent`)
+  - Type classes for ports (`EventStore`, `NotificationPort`)
+  - STM-based in-memory adapter
+  - Servant REST API for UI integration
+- Multiple iterations to fix type errors and monad stack issues
+
+**Phase 3: Architecture Refinement (Claude Code)**
+- Migrated to **Claude Code** for file-based development
+- **User**: Requested proper DDD structure with clear layer separation
+- Implemented:
+  - Value Objects with smart constructors (`TaskId`, `TaskDescription`)
+  - Entity (`Task`) with business logic
+  - Initial event system with string-based event types
+
+**Phase 4: Type Safety Enhancement**
+- **User**: "イベントの型を文字列じゃなくてADTにしてください" (Change event types from strings to ADT)
+- Refactored to `EventType` ADT (`TaskInitiated`, `TaskCompleted`, `TaskReopened`, `TaskDeleted`)
+- Added backward compatibility for legacy event names
+- Improved compile-time type safety
+
+**Phase 5: Facade Pattern Introduction**
+- **User**: "ドメイン層とアプリケーション層の境界をもっと明確にしたい" (Make the boundary between Domain and Application layers clearer)
+- Introduced `TodoDomainFacade` in Domain layer
+- Created `DomainOperations` facade in Application layer
+- Built Anti-Corruption Layer with DTOs
+- Separated domain types from infrastructure concerns
+
+**Phase 6: Infrastructure & Frontend**
+- Implemented Servant-based REST API with CORS
+- Built React + TypeScript + TailwindCSS UI
+- Created type-safe API client matching Haskell DTOs
+- Added real-time polling and statistics
+
+**Phase 7: Documentation & Tooling**
+- **User**: "README.mdのFile structureを実際のものと合わせてください" (Update README file structure to match actual project)
+- **User**: "環境構築情報をgitに入れたい" (Add development environment setup to git)
+- Created Dockerfile, devcontainer.json, .vscode/settings.json
+- Added Mermaid diagrams and comprehensive documentation
+
+### Development Approach
+
+This project was built through **true human-AI collaboration**:
+
+- **Co-Architecture**: Both human and AI shaped the design
+  - User directed architectural decisions (ADT events, Facade pattern, layer boundaries)
+  - Claude provided implementation suggestions and pattern recommendations
+  - User frequently rejected or refined Claude's proposals based on design vision
+- **Manual Implementation**: Developer manually typed all code from chat conversations (not copy-paste)
+  - Enabled real-time HLS type checking during input
+  - Caught type errors immediately while writing code
+  - Deeper understanding through active typing vs passive copying
+- **Iterative Dialogue**: Each feature evolved through multiple rounds of discussion and refinement
+- **Learning by Doing**: Typing code manually helped internalize DDD and Haskell patterns
+
+**Key Characteristics**:
+- **Collaborative Design**: Architecture emerged from negotiation, not dictation
+- **Human Final Authority**: Developer made all critical design decisions and rejected unsuitable suggestions
+- **AI as Assistant**: Claude generated code templates and explained patterns
+- **From Prototype to Production**: JavaScript demo → Haskell production implementation
+- **Bilingual Process**: Conversations in Japanese, deliverables in English
+
+**Reference**: [Initial conversation (JavaScript → Haskell transition)](https://claude.ai/share/5aff9dfb-9efa-4323-886d-783d98bd9a49)
+
+This codebase represents months of dialogue where human vision met AI implementation knowledge—neither could have built this alone.
+
 ## Current Status (2025-09-30)
 
 **Implementation Status**
