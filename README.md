@@ -34,18 +34,18 @@ This project was developed through conversations with **Claude** (claude.ai). Th
   - Entity (`Task`) with business logic
   - Initial event system with string-based event types
 
-**Phase 4: Type Safety Enhancement**
-- **User**: "イベントの型を文字列じゃなくてADTにしてください" (Change event types from strings to ADT)
-- Refactored to `EventType` ADT (`TaskInitiated`, `TaskCompleted`, `TaskReopened`, `TaskDeleted`)
-- Added backward compatibility for legacy event names
-- Improved compile-time type safety
-
-**Phase 5: Facade Pattern Introduction**
+**Phase 4: Facade Pattern Introduction**
 - **User**: "ドメイン層とアプリケーション層の境界をもっと明確にしたい" (Make the boundary between Domain and Application layers clearer)
 - Introduced `TodoDomainFacade` in Domain layer
 - Created `DomainOperations` facade in Application layer
 - Built Anti-Corruption Layer with DTOs
 - Separated domain types from infrastructure concerns
+
+**Phase 5: Type Safety Enhancement**
+- **User**: "イベントの型を文字列じゃなくてADTにしてください" (Change event types from strings to ADT)
+- Refactored to `EventType` ADT (`TaskInitiated`, `TaskCompleted`, `TaskReopened`, `TaskDeleted`)
+- Added backward compatibility for legacy event names
+- Improved compile-time type safety
 
 **Phase 6: Infrastructure & Frontend**
 - Implemented Servant-based REST API with CORS (manually typed by developer)
